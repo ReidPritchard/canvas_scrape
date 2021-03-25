@@ -1,11 +1,17 @@
-const { firefox } = require("playwright");
+const { chromium } = require("playwright");
 const Todoist = require("todoist");
 const { account, url, todoist_api_key } = require("./config");
 
 const todoist = Todoist(process.env.TODOIST_API_KEY || todoist_api_key);
 
 (async () => {
-	const browser = await firefox.launch({ headless: true });
+	var myArgs = process.argv.slice(2);
+	let browser;
+	if (myArgs[0] === "--dev") {
+		browser = await chromium.launch({ headless: false });
+	} else {
+		browser = await chromium.launch({ headless: true });
+	}
 	const context = await browser.newContext();
 	const page = await context.newPage();
 
@@ -34,8 +40,10 @@ const todoist = Todoist(process.env.TODOIST_API_KEY || todoist_api_key);
 		state: "attached",
 	});
 
+	// Load More?
+
 	// save login cookies
-	const cookies = await context.cookies();
+	// const cookies = await context.cookies();
 
 	// Next find every planner day that contains elements
 	// div[class*='planner-day']
@@ -74,7 +82,11 @@ const todoist = Todoist(process.env.TODOIST_API_KEY || todoist_api_key);
 			data = { ...data, ...(await scrape_assignment_data(content)) };
 		} else if (await verify_is_quiz(content)) {
 			data = { ...data, ...(await scrape_quiz_data(content)) };
+		} else if (await verify_is_discussion(content)) {
+			data = { ...data, ...(await scrape_discussion_data(content)) };
 		} else {
+			// close assignment page
+			await assignment_page.close();
 			continue;
 		}
 
@@ -99,6 +111,12 @@ const verify_is_assignment = async (content) => {
 
 const verify_is_quiz = async (content) => {
 	return !!(await content.$("div[id='quiz_show']"));
+};
+
+const verify_is_discussion = async (content) => {
+	return !!(await content.$(
+		"a[class='discussion-reply-action discussion-reply-box']"
+	));
 };
 
 const scrape_quiz_data = async (content) => {
@@ -141,14 +159,34 @@ const scrape_assignment_data = async (content) => {
 	};
 };
 
+const scrape_discussion_data = async (content) => {
+	const title = await (
+		await content.$("h1[class='discussion-title']")
+	).innerText();
+
+	const due_date = await (
+		await content.$("div[class='discussion-pubdate']")
+	).innerText();
+
+	const description = await (
+		await content.$("div[class='discussion-section message_wrapper']")
+	).innerText();
+
+	return {
+		title: title,
+		due_date: { string: due_date.replace(" by ", " ") },
+		description: description,
+	};
+};
+
 const todoist_export = async (assignments) => {
 	await todoist.sync();
 
 	const non_completed_items = todoist.items.get();
 
-	// const current_projects = todoist.state["projects"];
 	const all_things = await todoist.items.getAll();
-	const current_projects = Object.values(all_things["projects"]);
+	// const current_projects = Object.values(all_things["projects"]);
+	const current_projects = todoist.state["projects"];
 	const current_items = non_completed_items.concat(
 		Object.values(all_things["items"])
 	);
@@ -156,6 +194,7 @@ const todoist_export = async (assignments) => {
 	assignments.forEach(async (item) => {
 		const previous_item = await check_if_already_added(current_items, item);
 
+		console.log(item);
 		if (previous_item && previous_item.completed_date) {
 			// If previous item has already been completed don't update it
 			console.log(
@@ -204,9 +243,14 @@ const check_if_already_added = async (items, given_item) => {
 
 const find_related_project = async (projects, class_name) => {
 	const cleaned_class_name = await clean_name(class_name.toLowerCase());
-	const possible_project = projects.find((project) =>
-		project.name.toLowerCase().includes(cleaned_class_name)
-	);
+	// console.log("Class name : ", cleaned_class_name);
+
+	const possible_project = projects.find((project) => {
+		return project.name.toLowerCase().includes(cleaned_class_name);
+	});
+
+	// console.log(possible_project.id);
+
 	return possible_project ? possible_project.id : false;
 };
 

@@ -4,11 +4,11 @@
   "description": "",
   "main": "main.js",
   "dependencies": {
-    "playwright": "^1.1.1",
+    "playwright": "^1.8.0",
     "todoist": "^0.3.0"
   },
-  "devDependencies": {},
   "scripts": {
+    "dev": "node main.js --dev",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
   "keywords": [],
