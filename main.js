@@ -114,9 +114,14 @@ const verify_is_quiz = async (content) => {
 };
 
 const verify_is_discussion = async (content) => {
+  let temp_crumb = await content.$("#breadcrumbs > ul:nth-child(1) > li:nth-child(1) > a:nth-child(1) > span:nth-child(1)")
+
 	return !!(await content.$(
 		"a[class='discussion-reply-action discussion-reply-box']"
-	));
+	) && ( temp_crumb && 
+	  await (temp_crumb).innerText() === "Announcements"
+	)
+	);
 };
 
 const scrape_quiz_data = async (content) => {
@@ -229,6 +234,9 @@ const todoist_export = async (assignments) => {
 					"on todoist. Due at",
 					item.due_date.string
 				);
+        const data = {
+          ...(item.description && { description: item.description }),
+        };
 				await todoist.items.update({ ...data, id: previous_item.id });
 			}
 		}
