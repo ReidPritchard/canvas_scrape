@@ -1,17 +1,33 @@
 {
+  "$schema": "http://json.schemastore.org/package",
   "name": "canvas_scrape",
   "version": "1.0.0",
   "description": "",
+  "type": "module",
   "main": "main.js",
   "dependencies": {
+    "@doist/todoist-api-typescript": "^5.5.1",
+    "@notionhq/client": "^0.3.1",
+    "chrono-node": "^2.3.1",
+    "dotenv": "^17.2.2",
     "playwright": "^1.8.0",
-    "todoist": "^0.3.0"
+    "todoist": "^0.3.0",
+    "winston": "^3.17.0"
   },
   "scripts": {
     "dev": "node main.js --dev",
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "dev:skip-scraping": "node main.js --dev --skip-scraping",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "test:ui": "vitest --ui",
+    "test:coverage": "vitest run --coverage"
   },
   "keywords": [],
   "author": "",
-  "license": "ISC"
+  "license": "ISC",
+  "packageManager": "pnpm@10.0.0",
+  "devDependencies": {
+    "@vitest/coverage-v8": "^3.2.4",
+    "vitest": "^3.2.4"
+  }
 }
