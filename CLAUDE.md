@@ -473,6 +473,7 @@ if (myArgs[0] === "--dev") {
 These files should not be modified without explicit permission:
 
 - `.env`: Contains sensitive credentials (never commit to git)
+- `.env.keys`: Contains encryption keys for encrypted .env files (never commit to git, git-ignored)
 - `pnpm-lock.yaml`: Package manager lock file
 - `node_modules/`: Dependencies managed by package manager
 - `output.json`: Generated file (git-ignored, used for caching)
@@ -481,7 +482,15 @@ These files should not be modified without explicit permission:
 
 ---
 
-## 16. Recent Improvements (Last Updated: 2025-09-29)
+## 16. Recent Improvements (Last Updated: 2025-09-30)
+
+### Encrypted .env File Support (2025-09-30)
+
+- **Dotenvx Integration**: Replaced standard `dotenv` with `@dotenvx/dotenvx` for encrypted .env support
+- **Backward Compatible**: Automatically handles both plain and encrypted .env files
+- **Security Enhancement**: `.env.keys` file git-ignored to protect encryption keys
+- **Documentation**: Added encryption instructions to README.md and .env.example
+- **Testing**: Added test coverage for encrypted .env file loading
 
 ### Todoist Export Enhancements
 
@@ -500,7 +509,7 @@ These files should not be modified without explicit permission:
 
 - **Vitest Integration**: Configured test framework with watch mode, UI, and coverage
 - **Test Scripts**: Added comprehensive test commands to package.json
-- **Placeholder Tests**: Basic test structure in place for future test development
+- **Config Tests**: Test coverage for both plain and encrypted .env files
 
 ### Best Practices Discovered
 
@@ -508,6 +517,7 @@ These files should not be modified without explicit permission:
 - **Empty Update Prevention**: Check for meaningful changes before API calls
 - **Caching Strategy**: Use output.json for faster development iteration
 - **Environment Variables**: Prefer `.env` over hardcoded config values
+- **Encryption Security**: Never commit `.env.keys` files to version control
 
 ---
 

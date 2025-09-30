@@ -54,6 +54,26 @@ NOTION_DATABASE_ID=your_notion_database_id
 
 See "Logging Configuration" section below for environment variables.
 
+**Step 4: (Optional) Encrypt Your .env File**
+
+For enhanced security, you can encrypt your `.env` file using dotenvx:
+
+```bash
+# Encrypt your .env file
+npx dotenvx encrypt
+
+# This creates:
+# - An encrypted .env file (safe to commit to git)
+# - A .env.keys file (NEVER commit this - it's git-ignored)
+```
+
+The application automatically detects and decrypts encrypted `.env` files when the `.env.keys` file is present. You can continue using plain `.env` files if encryption is not needed.
+
+**Important:**
+- Keep your `.env.keys` file secure and never commit it to version control
+- The `.env.keys` file is already git-ignored for your safety
+- Share the `.env.keys` file securely with team members who need access
+
 ### Usage
 
 ```bash
@@ -401,10 +421,13 @@ Run `node src/performance-test.js` to validate performance metrics.
 
 ## Roadmap
 
+### Recently Completed
+
+- ✅ **Encrypted Credentials**: Integration with `@dotenvx/dotenvx` for encrypted `.env` files
+
 ### Planned Features
 
 - 🔄 **Interactive Setup Wizard**: CLI wizard for `.env` configuration (see `specs/feat-interactive-config-setup.md`)
-- 🔄 **Encrypted Credentials**: Integration with `@dotenvx/dotenvx` for encrypted `.env` files
 - 🔄 **Comprehensive Tests**: Full unit and integration test coverage
 - 🔄 **Performance Optimization**: Canvas scraping performance improvements
 
