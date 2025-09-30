@@ -66,9 +66,21 @@ jobs:
       - name: Generate checksums
         run: |
           cd dist
-          sha256sum canvas-scrape-macos > checksums.txt
-          sha256sum canvas-scrape-linux >> checksums.txt
-          sha256sum canvas-scrape-win.exe >> checksums.txt
+          if [ -f canvas-scrape-macos ]; then
+            sha256sum canvas-scrape-macos > checksums.txt
+          else
+            echo "canvas-scrape-macos: NOT FOUND" > checksums.txt
+          fi
+          if [ -f canvas-scrape-linux ]; then
+            sha256sum canvas-scrape-linux >> checksums.txt
+          else
+            echo "canvas-scrape-linux: NOT FOUND" >> checksums.txt
+          fi
+          if [ -f canvas-scrape-win.exe ]; then
+            sha256sum canvas-scrape-win.exe >> checksums.txt
+          else
+            echo "canvas-scrape-win.exe: NOT FOUND" >> checksums.txt
+          fi
           cat checksums.txt
       
       - name: Prepare release artifacts
