@@ -1,10 +1,19 @@
 import dotenv from "dotenv";
-// FIXME; Use dotenvx for encrypted .env files
+// TODO: Use dotenvx for encrypted .env files
+
+// TODO: Add support for config files for end user convenience
+// e.g. config.json or config.yaml at ~/Documents/canvas-scraper/ or similar
+// Ideally have UI to set this up
 
 // Load environment variables from .env file if it exists
-dotenv.config();
+dotenv.config({
+  quiet: true,
+  path: [".env", `${process.env.HOME}/.canvas-scraper.env`],
+});
 
 // Load environment variables from .env file if it exists
+const env_canvas_url = process.env.CANVAS_URL || "https://canvas.colorado.edu/";
+const env_canvas_username = process.env.CANVAS_USERNAME || "";
 const env_canvas_pwd = process.env.CANVAS_PWD || "";
 
 const env_notion_api_key = process.env.NOTION_API_KEY || "";
@@ -15,8 +24,8 @@ const env_todoist_api_key = process.env.TODOIST_API_KEY || "";
 const env_todoist_export = process.env.TODOIST_EXPORT === "true" || false;
 
 export default {
-  url: "https://canvas.colorado.edu/",
-  account: { username: "repr0811", password: env_canvas_pwd },
+  url: env_canvas_url,
+  account: { username: env_canvas_username, password: env_canvas_pwd },
   todoist_api_key: env_todoist_api_key,
   notion_api_key: env_notion_api_key,
   notion_db_id: env_notion_db_id,
