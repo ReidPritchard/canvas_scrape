@@ -13,6 +13,39 @@ This program automates the tedious process of manually tracking Canvas assignmen
 
 ## Quick Start
 
+### Download Pre-built Executable (Recommended)
+
+**For quick setup without Node.js:**
+
+1. Download the executable for your platform from [Releases](https://github.com/ReidPritchard/canvas_scrape/releases/latest)
+   - macOS: `canvas-scrape-macos`
+   - Linux: `canvas-scrape-linux`
+   - Windows: `canvas-scrape-win.exe`
+
+2. Make it executable (macOS/Linux):
+   ```bash
+   chmod +x canvas-scrape-macos
+   ```
+
+3. Download and configure `.env.example`:
+   ```bash
+   # Download config template
+   curl -LO https://github.com/ReidPritchard/canvas_scrape/releases/latest/download/.env.example
+   cp .env.example .env
+   # Edit .env with your credentials
+   ```
+
+4. Run the executable:
+   ```bash
+   ./canvas-scrape-macos
+   ```
+
+See [.github/ACTION_GUIDE.md](.github/ACTION_GUIDE.md) for detailed download instructions.
+
+### Install from Source
+
+**For development or customization:**
+
 ### Installation
 
 ```bash
@@ -295,6 +328,29 @@ pnpm run test:coverage
 
 **Note**: Currently only placeholder tests exist. Full test suite is pending implementation.
 
+### Building and Packaging
+
+```bash
+# Build bundled version
+pnpm run build
+
+# Package executables for all platforms
+pnpm run package
+```
+
+See [BUILD.md](BUILD.md) for detailed build documentation.
+
+### Creating Releases
+
+The repository includes a GitHub Action for automated releases:
+
+1. Go to **Actions** → **Package and Release**
+2. Click **Run workflow**
+3. Enter version (e.g., `v1.0.0`)
+4. Workflow creates GitHub Release with executables for macOS, Linux, and Windows
+
+See [.github/RELEASE.md](.github/RELEASE.md) for complete release process documentation and [.github/ACTION_GUIDE.md](.github/ACTION_GUIDE.md) for detailed usage instructions.
+
 ### File Structure
 
 The codebase is organized into focused modules for maintainability:
@@ -424,6 +480,7 @@ Run `node src/performance-test.js` to validate performance metrics.
 ### Recently Completed
 
 - ✅ **Encrypted Credentials**: Integration with `@dotenvx/dotenvx` for encrypted `.env` files
+- ✅ **Automated Releases**: GitHub Action workflow for packaging executables (macOS, Linux, Windows)
 
 ### Planned Features
 

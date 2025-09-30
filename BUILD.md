@@ -114,7 +114,35 @@ Logs in production mode are output as JSON to console for easy parsing and monit
 ./dist/canvas-scrape-macos --help
 ```
 
-## Distribution
+## Automated Releases with GitHub Actions
+
+The repository includes a GitHub Action workflow for automated packaging and releases.
+
+### Triggering a Release
+
+1. Navigate to **Actions** → **Package and Release** in the GitHub repository
+2. Click **Run workflow**
+3. Enter the release version (e.g., `v1.0.0`)
+4. Optionally mark as pre-release
+5. Click **Run workflow**
+
+The workflow will:
+- Build and package executables for all platforms
+- Generate SHA256 checksums
+- Create a GitHub Release with all artifacts
+- Include release notes and setup instructions
+
+### What Gets Released
+
+Each release includes:
+- `canvas-scrape-macos` - macOS x64 executable (priority platform)
+- `canvas-scrape-linux` - Linux x64 executable
+- `canvas-scrape-win.exe` - Windows x64 executable
+- `checksums.txt` - SHA256 checksums for verification
+- `.env.example` - Configuration template
+- `README.txt` - Quick start guide
+
+### Manual Distribution
 
 The generated executables are self-contained and can be distributed without Node.js installed on the target system. However, note:
 
