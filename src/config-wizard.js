@@ -70,8 +70,18 @@ function questionPassword(rl, question) {
   return new Promise((resolve) => {
     process.stdout.write(`${question}: `);
     
-    // Hide input temporarily
     const stdin = process.stdin;
+    
+    // AIDEV-NOTE: Check for TTY support before enabling raw mode
+    // Fallback to visible input in non-TTY environments (CI/CD, Docker, etc.)
+    if (!stdin.isTTY) {
+      console.warn("\n⚠️  Password will be visible (no TTY detected)");
+      return rl.question("", (answer) => {
+        resolve(answer.trim());
+      });
+    }
+    
+    // Hide input temporarily in TTY environments
     stdin.setRawMode(true);
     stdin.resume();
     stdin.setEncoding("utf8");
@@ -232,11 +242,28 @@ export async function runConfigWizard(configPath = null, format = null) {
     console.log("Security Options");
     console.log("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n");
 
-    const enableEncryption = await questionYesNo(
+    // AIDEV-NOTE: Encryption should be strongly recommended for configs with passwords
+    // Default to true and warn if user opts out
+    let enableEncryption = await questionYesNo(
       rl,
-      "Encrypt configuration file? (recommended)",
+      "Encrypt configuration file? (strongly recommended)",
       true
     );
+
+    // Add explicit warning if user declines encryption with password present
+    if (!enableEncryption && canvasPassword) {
+      console.log("\n⚠️  WARNING: Your password will be stored in PLAIN TEXT!");
+      console.log("   Anyone with access to the config file can read your password.");
+      const confirmPlain = await questionYesNo(
+        rl,
+        "Are you sure you want to continue without encryption?",
+        false
+      );
+      if (!confirmPlain) {
+        enableEncryption = true;
+        console.log("✅ Encryption enabled for security.");
+      }
+    }
 
     // Build configuration object
     const config = {

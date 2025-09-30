@@ -46,8 +46,17 @@ function loadJsonConfig(configPath) {
         console.warn(`⚠️  Encrypted config found but keys file missing: ${keysPath}`);
       }
     } else {
-      // Plain JSON - parse and set environment variables
+      // Plain JSON - parse and validate structure
       const config = JSON.parse(content);
+      
+      // AIDEV-NOTE: Validate required configuration fields
+      const required = ["CANVAS_URL", "CANVAS_USERNAME", "CANVAS_PWD"];
+      const missing = required.filter(key => !config[key]);
+      if (missing.length > 0) {
+        throw new Error(`Missing required fields: ${missing.join(", ")}`);
+      }
+      
+      // Set environment variables
       Object.entries(config).forEach(([key, value]) => {
         if (!process.env[key]) {
           process.env[key] = String(value);
