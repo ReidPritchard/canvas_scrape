@@ -1,0 +1,13 @@
+{
+  "CANVAS_URL": "https://canvas.colorado.edu/",
+  "CANVAS_USERNAME": "your_username",
+  "CANVAS_PWD": "your_password",
+  "TODOIST_EXPORT": "false",
+  "TODOIST_API_KEY": "",
+  "NOTION_EXPORT": "false",
+  "NOTION_API_KEY": "",
+  "NOTION_DATABASE_ID": "",
+  "NODE_ENV": "production",
+  "LOG_LEVEL": "info",
+  "ENABLE_FILE_LOGGING": "true"
+}
