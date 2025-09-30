@@ -7,3 +7,9 @@ node_modules
 .DS_Store
 .env
 logs
+
+# Build artifacts
+dist/
+output.json
+main-*
+*.exe
