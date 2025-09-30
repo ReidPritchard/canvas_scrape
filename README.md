@@ -5,6 +5,7 @@ A comprehensive Node.js automation tool that scrapes assignments, quizzes, and a
 ## Overview
 
 This program automates the tedious process of manually tracking Canvas assignments by:
+
 - **Web Scraping**: Uses Playwright to automate Canvas login and data extraction
 - **Data Processing**: Parses assignment details (title, due date, description, class)
 - **Export Integration**: Syncs with Todoist API and Notion API for task management
@@ -24,9 +25,34 @@ pnpm exec playwright install
 
 ### Configuration
 
-1. **Update Canvas URL** (if not CU): Edit `config.js` to change the Canvas URL
-2. **Set Credentials**: Add your Canvas password and API keys to environment variables
-3. **Configure Logging**: Set logging preferences (see Logging Configuration below)
+**Step 1: Create .env file**
+
+Copy the example template and add your credentials:
+
+```bash
+cp .env.example .env
+# Edit .env with your credentials (see below)
+```
+
+**Step 2: Required Environment Variables**
+
+```bash
+# Canvas LMS password (required)
+CANVAS_PWD=your_canvas_password
+
+# Todoist integration (optional)
+TODOIST_EXPORT=true
+TODOIST_API_KEY=your_todoist_api_key
+
+# Notion integration (optional)
+NOTION_EXPORT=true
+NOTION_API_KEY=your_notion_api_key
+NOTION_DATABASE_ID=your_notion_database_id
+```
+
+**Step 3: Configure Logging (optional)**
+
+See "Logging Configuration" section below for environment variables.
 
 ### Usage
 
@@ -36,6 +62,9 @@ node main.js
 
 # Run in development mode (visible browser)
 pnpm run dev
+
+# Run with cached data (faster testing, no Canvas scraping)
+pnpm run dev:skip-scraping
 ```
 
 ## Logging Configuration
@@ -44,11 +73,11 @@ The Canvas Scraper uses Winston for comprehensive structured logging. Logging be
 
 ### Environment Variables
 
-| Variable | Description | Default | Example |
-|----------|-------------|---------|---------|
-| `NODE_ENV` | Environment mode | `production` | `development` |
-| `LOG_LEVEL` | Minimum log level | `info` (prod), `debug` (dev) | `debug`, `info`, `warn`, `error` |
-| `ENABLE_FILE_LOGGING` | Enable log files | `true` | `false` |
+| Variable              | Description       | Default                      | Example                          |
+| --------------------- | ----------------- | ---------------------------- | -------------------------------- |
+| `NODE_ENV`            | Environment mode  | `production`                 | `development`                    |
+| `LOG_LEVEL`           | Minimum log level | `info` (prod), `debug` (dev) | `debug`, `info`, `warn`, `error` |
+| `ENABLE_FILE_LOGGING` | Enable log files  | `true`                       | `false`                          |
 
 ### Configuration Options
 
@@ -76,12 +105,14 @@ logs/
 ### Development vs Production
 
 **Development Mode** (`--dev` flag or `NODE_ENV=development`):
+
 - Console output with colors and readable formatting
 - Debug-level logging enabled
 - Additional debug.log file created
 - Detailed Canvas scraping context
 
 **Production Mode** (default):
+
 - JSON-formatted console output (if enabled)
 - Info-level logging minimum
 - Optimized performance
@@ -90,12 +121,14 @@ logs/
 ### Example Log Output
 
 **Development Mode:**
+
 ```
 2025-09-18 23:15:42 info: [canvas-scraping] Canvas login successful {"nextStep":"dashboard_navigation","timestamp":"2025-09-18T23:15:42.765Z"}
 2025-09-18 23:15:43 debug: [canvas-scraping] Accessing Canvas planner view {"selector":"button[id=\"planner-today-btn\"]","view":"planner"}
 ```
 
 **Production Mode:**
+
 ```json
 {"context":"canvas-scraping","level":"info","message":"Canvas login successful","nextStep":"dashboard_navigation","timestamp":"2025-09-18T23:15:42.765Z"}
 {"context":"canvas-scraping","level":"info","message":"Scraping completed","assignments":[],"assignmentsFound":0,"timestamp":"2025-09-18T23:15:43.585Z"}
@@ -112,6 +145,7 @@ node src/performance-test.js --performance-test
 ```
 
 Performance targets:
+
 - Logging overhead: <25% of Canvas processing time
 - Memory usage: <600 bytes per log entry
 - File I/O: Non-blocking and performant
@@ -119,6 +153,7 @@ Performance targets:
 ### Security Considerations
 
 The logging system automatically sanitizes sensitive data:
+
 - Passwords, API keys, tokens, and secrets are automatically redacted
 - Log files use appropriate file permissions
 - Sensitive Canvas data is filtered before logging
@@ -146,6 +181,7 @@ grep "SESSION_ID" logs/app.log
 ### Common Issues
 
 **Logs not appearing in files:**
+
 ```bash
 # Check log directory exists
 ls -la logs/
@@ -158,6 +194,7 @@ ENABLE_FILE_LOGGING=true node main.js
 ```
 
 **Too much/little console output:**
+
 ```bash
 # Reduce console verbosity
 LOG_LEVEL=warn node main.js
@@ -170,6 +207,7 @@ FORCE_CONSOLE_LOGGING=false node main.js
 ```
 
 **Performance issues:**
+
 ```bash
 # Run performance diagnostics
 node src/performance-test.js
@@ -182,6 +220,7 @@ node --inspect main.js
 ```
 
 **Canvas scraping errors:**
+
 - Check `logs/error.log` for detailed error context
 - Run in development mode for visual debugging: `pnpm run dev`
 - Verify Canvas URL and credentials in `config.js`
@@ -197,6 +236,7 @@ LOG_LEVEL=debug pnpm run dev
 ```
 
 This provides:
+
 - Detailed Canvas selector information
 - Step-by-step scraping progress
 - Performance timing data
@@ -217,6 +257,24 @@ pnpm exec playwright install
 LOG_LEVEL=debug pnpm run dev
 ```
 
+### Testing
+
+```bash
+# Run all tests
+pnpm test
+
+# Run tests in watch mode
+pnpm run test:watch
+
+# Run tests with UI
+pnpm run test:ui
+
+# Run tests with coverage
+pnpm run test:coverage
+```
+
+**Note**: Currently only placeholder tests exist. Full test suite is pending implementation.
+
 ### File Structure
 
 The codebase is organized into focused modules for maintainability:
@@ -224,32 +282,40 @@ The codebase is organized into focused modules for maintainability:
 ```
 canvas_scrape/
 ├── main.js                     # Main orchestration and entry point
-├── config.js                   # Configuration and credentials
+├── config.js                   # Configuration loader with .env support
+├── .env.example                # Environment variable template
 ├── src/
-│   ├── selectors.js             # Canvas CSS selectors (centralized)
-│   ├── canvas-scraper.js        # Canvas login and scraping logic
-│   ├── todoist-export.js        # Todoist API integration
+│   ├── canvas-scraper.js        # Canvas authentication and content extraction
+│   ├── todoist-export.js        # Todoist API integration (REST API)
 │   ├── notion-export.js         # Notion API integration
+│   ├── selectors.js             # Canvas CSS selectors (centralized)
 │   ├── logger.js                # Winston logging configuration
-│   └── performance-test.js      # Performance testing suite
+│   └── error-handler.js         # Shared error handling utilities
 ├── tests/
-│   └── integration.test.js      # Basic integration tests
-└── logs/                        # Log files and performance results
+│   └── placeholder.test.js      # Placeholder tests (Vitest)
+├── specs/
+│   └── feat-*.md                # Feature specifications and proposals
+├── logs/                        # Log files (auto-rotated)
+└── output.json                  # Cached assignment data (git-ignored)
 ```
 
 **Core Module Purpose:**
-- **`main.js`**: Simplified orchestration and command-line interface
-- **`src/selectors.js`**: All Canvas CSS selectors organized by page type
+
+- **`main.js`**: Orchestration with session tracking and error handling
+- **`config.js`**: Environment variable loader with sensible defaults
 - **`src/canvas-scraper.js`**: Canvas authentication and content extraction
-- **`src/todoist-export.js`**: Todoist task creation and management
+- **`src/todoist-export.js`**: Todoist REST API with date cleaning and label support
 - **`src/notion-export.js`**: Notion database integration
-- **`tests/integration.test.js`**: End-to-end testing functionality
+- **`src/selectors.js`**: All Canvas CSS selectors organized by page type
+- **`src/logger.js`**: Winston configuration with structured logging
+- **`tests/placeholder.test.js`**: Minimal Vitest tests (full suite pending)
 
 ### Updating Canvas Selectors
 
 When Canvas updates their UI, selectors may break. The codebase centralizes all selectors in `src/selectors.js` for easy maintenance.
 
 **Selector Categories:**
+
 - **Login**: Username/password fields and submit button
 - **Navigation**: Dashboard links and planner button
 - **Planner**: Assignment/quiz item discovery selectors
@@ -258,6 +324,7 @@ When Canvas updates their UI, selectors may break. The codebase centralizes all 
 - **Discussion**: Title, publish date, and content extraction
 
 **Update Process:**
+
 1. **Identify broken selector**: Check error logs for "selector not found" messages
 2. **Debug visually**: Run `pnpm run dev` to see Canvas UI in browser
 3. **Update selector**: Edit the appropriate category in `src/selectors.js`
@@ -265,6 +332,7 @@ When Canvas updates their UI, selectors may break. The codebase centralizes all 
 5. **Keep legacy**: Comment out old selectors with "Legacy" note for reference
 
 **Example Update:**
+
 ```javascript
 // In src/selectors.js
 assignment: {
@@ -280,11 +348,13 @@ See `CLAUDE.md` for detailed development guidelines and AI assistant instruction
 ## API Integration
 
 ### Todoist Setup
+
 1. Get API key from Todoist settings
 2. Add to `config.js` or environment variable
 3. Test connection with development mode
 
 ### Notion Setup
+
 1. Create Notion integration
 2. Get API key and database ID
 3. Add to `config.js` or environment variable
@@ -293,6 +363,7 @@ See `CLAUDE.md` for detailed development guidelines and AI assistant instruction
 ## Performance
 
 The Canvas Scraper is optimized for performance:
+
 - **Logging Overhead**: <25% of total processing time
 - **Memory Usage**: <600 bytes per log entry
 - **File I/O**: Non-blocking operations
@@ -306,6 +377,43 @@ Run `node src/performance-test.js` to validate performance metrics.
 - **File Permissions**: Log files use secure permissions
 - **API Keys**: Never logged in plain text
 - **Canvas Data**: Personal information filtered before logging
+
+## Recent Updates (2025-09-29)
+
+### Todoist Export Improvements
+
+- ✅ **Date Cleaning**: Automatically removes "Due: " prefix from Canvas dates
+- ✅ **Label Support**: Adds class name and assignment type as Todoist labels
+- ✅ **Smart Updates**: Skips unnecessary updates when no changes exist
+- ✅ **Canvas Links**: Appends assignment URLs to task descriptions
+
+### Configuration Enhancements
+
+- ✅ **Notion Export Toggle**: Added `NOTION_EXPORT` environment variable
+- ✅ **JSON Caching**: Always exports to `output.json` for debugging
+- ✅ **Skip Scraping Mode**: `--skip-scraping` flag for faster testing
+
+### Testing Infrastructure
+
+- ✅ **Vitest Integration**: Full test framework configured
+- ✅ **Test Commands**: watch, UI, and coverage modes available
+- ⚠️ **Pending**: Comprehensive test suite implementation
+
+## Roadmap
+
+### Planned Features
+
+- 🔄 **Interactive Setup Wizard**: CLI wizard for `.env` configuration (see `specs/feat-interactive-config-setup.md`)
+- 🔄 **Encrypted Credentials**: Integration with `@dotenvx/dotenvx` for encrypted `.env` files
+- 🔄 **Comprehensive Tests**: Full unit and integration test coverage
+- 🔄 **Performance Optimization**: Canvas scraping performance improvements
+
+### Under Consideration
+
+- Canvas calendar view scraping
+- Assignment status tracking (submitted vs. pending)
+- Multi-Canvas-instance support
+- GitHub Issues integration
 
 ## License
 

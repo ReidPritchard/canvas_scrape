@@ -5,6 +5,7 @@
 **Canvas Scraper** is a Node.js automation tool that scrapes assignments, quizzes, and announcements from Canvas LMS (Learning Management System) and exports them to productivity tools (Todoist and Notion). It helps students automatically sync their Canvas assignments with their personal task management systems.
 
 Key components:
+
 - **Web Scraping**: Uses Playwright to automate Canvas login and data extraction
 - **Data Processing**: Parses assignment details (title, due date, description, class)
 - **Export Integration**: Syncs with Todoist API and Notion API for task management
@@ -15,14 +16,14 @@ Key components:
 
 ## 1. Non-negotiable Golden Rules
 
-| #: | AI *may* do | AI *must NOT* do |
-|---|-------------|------------------|
+| #:  | AI _may_ do                                                                      | AI _must NOT_ do                                                                      |
+| --- | -------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------- |
 | G-0 | Ask for clarification when unsure about Canvas configuration or API requirements | ❌ Make assumptions about Canvas URL structure or authentication without confirmation |
-| G-1 | Generate code **only inside** the main project directory | ❌ Touch config.js with real credentials or commit sensitive data |
-| G-2 | Add/update **`AIDEV-NOTE:` anchor comments** near non-trivial edited code | ❌ Delete or modify existing `AIDEV-` comments |
-| G-3 | Follow existing JavaScript ES module style and Playwright patterns | ❌ Reformat code to different style standards or change module system |
-| G-4 | For changes >50 LOC or affecting core scraping logic, ask for confirmation | ❌ Make large refactors to scraping selectors without human guidance |
-| G-5 | Stay within current task context | ❌ Continue work from prior prompts after "new task" designation |
+| G-1 | Generate code **only inside** the main project directory                         | ❌ Touch config.js with real credentials or commit sensitive data                     |
+| G-2 | Add/update **`AIDEV-NOTE:` anchor comments** near non-trivial edited code        | ❌ Delete or modify existing `AIDEV-` comments                                        |
+| G-3 | Follow existing JavaScript ES module style and Playwright patterns               | ❌ Reformat code to different style standards or change module system                 |
+| G-4 | For changes >50 LOC or affecting core scraping logic, ask for confirmation       | ❌ Make large refactors to scraping selectors without human guidance                  |
+| G-5 | Stay within current task context                                                 | ❌ Continue work from prior prompts after "new task" designation                      |
 
 ---
 
@@ -33,13 +34,20 @@ pnpm install                    # Install dependencies
 pnpm exec playwright install    # Install Playwright browsers
 node main.js                    # Run scraper in headless mode
 pnpm run dev                    # Run scraper with visible browser (--dev flag)
+pnpm run dev:skip-scraping      # Run with cached output.json (faster testing)
+pnpm test                       # Run test suite with vitest
+pnpm run test:watch             # Run tests in watch mode
+pnpm run test:ui                # Run tests with UI interface
+pnpm run test:coverage          # Run tests with coverage report
 ```
 
 **Special Setup Notes:**
+
 - Requires Playwright browser installation after dependency install
 - Uses ES modules (type: "module" in package.json)
-- No formal test suite currently implemented
+- Test framework: Vitest (configured but minimal tests implemented)
 - Configuration requires API keys for Todoist and Notion
+- `.env` file required for credentials (see `.env.example` template)
 
 ---
 
@@ -55,6 +63,7 @@ pnpm run dev                    # Run scraper with visible browser (--dev flag)
 - **Testing**: Manual testing with --dev flag for visual debugging
 
 **Example code pattern:**
+
 ```javascript
 const verify_is_assignment = async (content) => {
   return !!(await content.$("div[id='assignment_show']"));
@@ -65,18 +74,29 @@ const verify_is_assignment = async (content) => {
 
 ## 4. Project Layout & Core Components
 
-| Directory/File | Description |
-|----------------|-------------|
-| `main.js` | Main scraping logic and export functions |
-| `config.js` | Sensitive configuration (credentials, URLs, API keys) |
-| `package.json` | Dependencies and scripts |
-| `node_modules/` | Dependencies (not version controlled) |
+| Directory/File          | Description                                              |
+| ----------------------- | -------------------------------------------------------- |
+| `main.js`               | Main orchestration and entry point with session tracking |
+| `config.js`             | Configuration loader with environment variable support   |
+| `src/canvas-scraper.js` | Canvas authentication and content extraction             |
+| `src/todoist-export.js` | Todoist API integration with REST API                    |
+| `src/notion-export.js`  | Notion API integration                                   |
+| `src/logger.js`         | Winston logging configuration                            |
+| `src/selectors.js`      | Centralized Canvas CSS selectors                         |
+| `src/error-handler.js`  | Shared error handling utilities                          |
+| `tests/`                | Vitest test suite (placeholder tests only)               |
+| `specs/`                | Feature specifications and proposals                     |
+| `.env.example`          | Environment variable template                            |
+| `output.json`           | Cached assignment data for testing                       |
+| `package.json`          | Dependencies and scripts                                 |
 
 **Key domain models/concepts:**
+
 - **Assignment**: Canvas assignment with title, due date, description, class
 - **Quiz**: Canvas quiz with title, due date (no description)
 - **Discussion/Announcement**: Canvas discussion post with title, date, content
 - **Export Item**: Standardized data structure for Todoist/Notion APIs
+- **Session**: Unique session ID for correlating logs across operations
 
 ---
 
@@ -86,79 +106,85 @@ The Canvas Scraper uses Winston for comprehensive structured logging throughout 
 
 ### Logging Architecture
 
-| Component | Purpose | File Location |
-|-----------|---------|---------------|
-| `src/logger.js` | Winston logger configuration and setup | Core logging module |
-| `logs/app.log` | All application logs (info level and above) | Auto-rotated, 5MB max |
-| `logs/error.log` | Error logs only for critical issue tracking | Auto-rotated, 5MB max |
-| `logs/debug.log` | Debug logs (development mode only) | Auto-rotated, 5MB max |
-| `config.js` | Logging configuration section | Environment-aware settings |
+| Component        | Purpose                                     | File Location              |
+| ---------------- | ------------------------------------------- | -------------------------- |
+| `src/logger.js`  | Winston logger configuration and setup      | Core logging module        |
+| `logs/app.log`   | All application logs (info level and above) | Auto-rotated, 5MB max      |
+| `logs/error.log` | Error logs only for critical issue tracking | Auto-rotated, 5MB max      |
+| `logs/debug.log` | Debug logs (development mode only)          | Auto-rotated, 5MB max      |
+| `config.js`      | Logging configuration section               | Environment-aware settings |
 
 ### Development Workflow with Logging
 
 **Development Mode** (`--dev` flag):
+
 ```javascript
 // AIDEV-NOTE: Development logging provides rich debugging context
-logger.debug('Canvas selector found', {
-  context: 'canvas-scraping',
+logger.debug("Canvas selector found", {
+  context: "canvas-scraping",
   selector: 'div[class*="planner-item"]',
   elementCount: items.length,
-  sessionId: SESSION_ID
+  sessionId: SESSION_ID,
 });
 ```
 
 **Production Mode** (default):
+
 ```javascript
 // AIDEV-NOTE: Production logging optimized for performance and monitoring
-logger.info('Canvas scraping completed', {
-  context: 'canvas-scraping',
+logger.info("Canvas scraping completed", {
+  context: "canvas-scraping",
   assignmentsFound: assignments.length,
   timing: performance.now() - startTime,
-  sessionId: SESSION_ID
+  sessionId: SESSION_ID,
 });
 ```
 
 ### Canvas Operation Context
 
 **Session Correlation:**
+
 - Each scraping session gets a unique UUID for tracking operations
 - All logs within a session include the `sessionId` for correlation
 - Useful for debugging failed sessions or performance analysis
 
 **Canvas-Specific Logging:**
+
 ```javascript
 // AIDEV-NOTE: Canvas operations include detailed context for debugging
-logger.info('Canvas assignment discovered', {
-  context: 'canvas-scraping',
-  operation: 'assignment-extract',
+logger.info("Canvas assignment discovered", {
+  context: "canvas-scraping",
+  operation: "assignment-extract",
   assignmentId: assignment.id,
   title: assignment.title,
   dueDate: assignment.dueDate,
   course: assignment.course,
   canvasUrl: assignment.url,
-  sessionId: SESSION_ID
+  sessionId: SESSION_ID,
 });
 ```
 
 ### Performance Monitoring Integration
 
 **Performance Tracking:**
+
 ```javascript
 // AIDEV-NOTE: Performance monitoring integrated throughout scraping process
 const operationStart = performance.now();
 // ... Canvas operation ...
 const operationTime = performance.now() - operationStart;
 
-logger.info('Canvas operation completed', {
-  context: 'performance',
-  operation: 'login-sequence',
+logger.info("Canvas operation completed", {
+  context: "performance",
+  operation: "login-sequence",
   timing: operationTime,
   memoryUsage: process.memoryUsage().heapUsed,
-  sessionId: SESSION_ID
+  sessionId: SESSION_ID,
 });
 ```
 
 **Memory Monitoring:**
+
 - Automatic memory usage tracking during long scraping sessions
 - Alerts for memory leaks or excessive usage
 - Integration with performance test suite
@@ -166,58 +192,63 @@ logger.info('Canvas operation completed', {
 ### Error Handling and Debugging
 
 **Canvas Selector Debugging:**
+
 ```javascript
 // AIDEV-NOTE: Canvas selectors logged for debugging when elements not found
 try {
   const element = await page.$(selector);
   if (!element) {
-    logger.warn('Canvas selector not found', {
-      context: 'canvas-scraping',
+    logger.warn("Canvas selector not found", {
+      context: "canvas-scraping",
       selector: selector,
       pageUrl: page.url(),
       pageTitle: await page.title(),
-      sessionId: SESSION_ID
+      sessionId: SESSION_ID,
     });
   }
 } catch (error) {
-  logger.error('Canvas selector error', {
-    context: 'canvas-scraping',
+  logger.error("Canvas selector error", {
+    context: "canvas-scraping",
     selector: selector,
     error: error.message,
     stack: error.stack,
-    sessionId: SESSION_ID
+    sessionId: SESSION_ID,
   });
 }
 ```
 
 **API Integration Logging:**
+
 ```javascript
 // AIDEV-NOTE: API operations logged with response status and timing
-logger.info('Todoist API request', {
-  context: 'api-integration',
-  service: 'todoist',
-  operation: 'create-task',
+logger.info("Todoist API request", {
+  context: "api-integration",
+  service: "todoist",
+  operation: "create-task",
   taskTitle: task.title,
   responseStatus: response.status,
   timing: apiTime,
-  sessionId: SESSION_ID
+  sessionId: SESSION_ID,
 });
 ```
 
 ### Production Considerations
 
 **Sensitive Data Protection:**
+
 - Automatic redaction of passwords, API keys, and tokens
 - Canvas personal data filtered before logging
 - Use `sanitizeLogData()` for user-provided content
 
 **Performance Impact:**
+
 - Logging overhead: <25% of Canvas processing time
 - Memory usage: <600 bytes per log entry
 - File I/O operations: Non-blocking
 - Automatic log rotation prevents disk space issues
 
 **File Management:**
+
 - Logs automatically rotate at 5MB per file
 - Historical retention: 5 files per log type
 - Debug logs only in development mode
@@ -226,6 +257,7 @@ logger.info('Todoist API request', {
 ### Common Debugging Patterns
 
 **Canvas Scraping Issues:**
+
 ```bash
 # Find Canvas login problems
 grep "Canvas login" logs/app.log | tail -10
@@ -239,6 +271,7 @@ grep "$SESSION_ID" logs/app.log
 ```
 
 **Performance Analysis:**
+
 ```bash
 # Check operation timing
 grep "timing" logs/app.log | jq '.timing' | sort -n
@@ -251,6 +284,7 @@ grep "Canvas.*completed" logs/app.log | wc -l
 ```
 
 **API Integration Debugging:**
+
 ```bash
 # Check API response patterns
 grep "api-integration" logs/app.log | jq '.responseStatus'
@@ -262,12 +296,14 @@ grep "api-integration" logs/error.log
 ### Integration with External Monitoring
 
 **Log Format for Analysis:**
+
 - All logs use structured JSON format
 - Consistent field naming across operations
 - Timestamp in ISO 8601 format
 - Context-based log grouping
 
 **Recommended Monitoring Queries:**
+
 - Error rate: `grep "error" logs/app.log | wc -l`
 - Session success: `grep "Scraping completed" logs/app.log`
 - Performance degradation: `grep "timing.*[5-9][0-9][0-9][0-9]" logs/app.log`
@@ -290,6 +326,7 @@ Add specially formatted comments throughout the codebase for inline knowledge th
 - Add anchors for code that is: complex, important, confusing, or potentially buggy
 
 Example:
+
 ```javascript
 // AIDEV-NOTE: Canvas selectors are fragile - verify after Canvas updates
 const title = await (await content.$('h1[class="title"]')).innerText();
@@ -316,14 +353,19 @@ const title = await (await content.$('h1[class="title"]')).innerText();
 - **API Integration**: REST APIs for Todoist and Notion with authentication headers
 
 **Example pattern:**
+
 ```javascript
 // Canvas selector pattern
-const item_links = await page$$("div[class*='planner-item'] >> div[class*='title'] >> a");
+const item_links = await page$$(
+  "div[class*='planner-item'] >> div[class*='title'] >> a",
+);
 
 // API call pattern
 const response = await notion.pages.create({
   parent: { database_id: notion_db_id },
-  properties: { /* structured data */ }
+  properties: {
+    /* structured data */
+  },
 });
 ```
 
@@ -334,12 +376,14 @@ const response = await notion.pages.create({
 This project integrates specifically with Canvas LMS (University of Colorado configuration).
 
 **Key points:**
+
 - **URL Structure**: https://canvas.colorado.edu/ (configurable in config.js)
 - **Authentication**: Standard Canvas login form with username/password
 - **Navigation Flow**: Login → Dashboard → Planner view for assignment overview
 - **Content Types**: Supports assignments, quizzes, and announcements/discussions
 
 **Testing approach:**
+
 - Use `--dev` flag to run with visible browser for debugging selectors
 - Test with actual Canvas account to verify scraping accuracy
 - Validate export data in Todoist/Notion after runs
@@ -354,12 +398,13 @@ This project integrates specifically with Canvas LMS (University of Colorado con
 - **Test organization**: No formal test suite - relies on production testing
 
 **Example test:**
+
 ```javascript
 // Manual testing pattern
 if (myArgs[0] === "--dev") {
   browser = await chromium.launch({ headless: false }); // Visual debugging
 } else {
-  browser = await chromium.launch({ headless: true });  // Production
+  browser = await chromium.launch({ headless: true }); // Production
 }
 ```
 
@@ -382,6 +427,9 @@ if (myArgs[0] === "--dev") {
 - **Timezone Issues**: Date parsing requires timezone awareness (MDT/MST)
 - **Missing Browser Install**: Playwright requires `pnpm exec playwright install`
 - **Credential Exposure**: Never commit config.js with real credentials to git
+- **Date String Formatting**: Canvas adds "Due: " prefix to dates - clean before sending to APIs
+- **Empty Updates**: Skip Todoist updates when no description exists (e.g., quizzes)
+- **API Response Handling**: Check for null/undefined in API responses before processing
 
 ---
 
@@ -424,11 +472,42 @@ if (myArgs[0] === "--dev") {
 
 These files should not be modified without explicit permission:
 
-- `config.js`: Contains sensitive credentials and API keys
+- `.env`: Contains sensitive credentials (never commit to git)
 - `pnpm-lock.yaml`: Package manager lock file
 - `node_modules/`: Dependencies managed by package manager
+- `output.json`: Generated file (git-ignored, used for caching)
 
 **When adding new files**, ensure they don't contain credentials and follow the ES module pattern.
+
+---
+
+## 16. Recent Improvements (Last Updated: 2025-09-29)
+
+### Todoist Export Enhancements
+
+- **Date Cleaning**: Automatically removes "Due: " prefix from Canvas dates before sending to Todoist
+- **Label Support**: Adds class name and assignment type as Todoist labels
+- **Smart Updates**: Skips updates when no changes exist (e.g., quizzes without descriptions)
+- **Canvas Links**: Appends Canvas assignment URLs to Todoist descriptions for quick access
+
+### Configuration Improvements
+
+- **Notion Export Toggle**: Added `NOTION_EXPORT` environment variable for conditional export
+- **JSON Caching**: Always exports to `output.json` for debugging and faster testing
+- **Skip Scraping Mode**: `--skip-scraping` flag loads cached data from output.json
+
+### Testing Infrastructure
+
+- **Vitest Integration**: Configured test framework with watch mode, UI, and coverage
+- **Test Scripts**: Added comprehensive test commands to package.json
+- **Placeholder Tests**: Basic test structure in place for future test development
+
+### Best Practices Discovered
+
+- **Date Formatting**: Always clean Canvas date strings before API submission
+- **Empty Update Prevention**: Check for meaningful changes before API calls
+- **Caching Strategy**: Use output.json for faster development iteration
+- **Environment Variables**: Prefer `.env` over hardcoded config values
 
 ---
 
