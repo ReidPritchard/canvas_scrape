@@ -1,12 +1,16 @@
-import dotenv from "dotenv";
-// TODO: Use dotenvx for encrypted .env files
+import { config as dotenvxConfig } from "@dotenvx/dotenvx";
+
+// AIDEV-NOTE: Using dotenvx for encrypted .env file support
+// Supports both plain and encrypted .env files automatically
+// Encrypted files use .env.keys for decryption (git-ignored)
 
 // TODO: Add support for config files for end user convenience
 // e.g. config.json or config.yaml at ~/Documents/canvas-scraper/ or similar
 // Ideally have UI to set this up
 
 // Load environment variables from .env file if it exists
-dotenv.config({
+// Supports both plain and encrypted .env files
+dotenvxConfig({
   quiet: true,
   path: [".env", `${process.env.HOME}/.canvas-scraper.env`],
 });
