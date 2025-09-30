@@ -17,6 +17,7 @@
     "winston": "^3.17.0"
   },
   "scripts": {
+    "setup": "node setup.js",
     "dev": "node main.js --dev",
     "dev:skip-scraping": "node main.js --dev --skip-scraping",
     "build": "rm -rf dist && node build.js",

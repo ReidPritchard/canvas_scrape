@@ -1,19 +1,114 @@
 import { config as dotenvxConfig } from "@dotenvx/dotenvx";
+import fs from "fs";
+import path from "path";
 
-// AIDEV-NOTE: Using dotenvx for encrypted .env file support
-// Supports both plain and encrypted .env files automatically
-// Encrypted files use .env.keys for decryption (git-ignored)
+// AIDEV-NOTE: Enhanced config loader with support for:
+// - Custom config paths via CONFIG_PATH env var or --config CLI flag
+// - Multiple formats: .env and JSON files
+// - Encryption support for both formats via dotenvx
+// - Automatic detection of config files in standard locations
 
-// TODO: Add support for config files for end user convenience
-// e.g. config.json or config.yaml at ~/Documents/canvas-scraper/ or similar
-// Ideally have UI to set this up
+/**
+ * Get custom config path from environment or CLI arguments
+ * @returns {string|null} Custom config path or null
+ */
+function getCustomConfigPath() {
+  // Check environment variable
+  if (process.env.CONFIG_PATH) {
+    return process.env.CONFIG_PATH;
+  }
 
-// Load environment variables from .env file if it exists
-// Supports both plain and encrypted .env files
-dotenvxConfig({
-  quiet: true,
-  path: [".env", `${process.env.HOME}/.canvas-scraper.env`],
-});
+  // Check CLI arguments for --config flag
+  const args = process.argv;
+  const configFlagIndex = args.indexOf("--config");
+  if (configFlagIndex !== -1 && args[configFlagIndex + 1]) {
+    return args[configFlagIndex + 1];
+  }
+
+  return null;
+}
+
+/**
+ * Load configuration from JSON file
+ * @param {string} configPath - Path to JSON config file
+ */
+function loadJsonConfig(configPath) {
+  try {
+    const content = fs.readFileSync(configPath, "utf-8");
+
+    // Check if file appears to be encrypted (dotenvx format)
+    if (content.includes("#/---")) {
+      // Encrypted JSON - use dotenvx to decrypt
+      const keysPath = `${configPath}.keys`;
+      if (fs.existsSync(keysPath)) {
+        dotenvxConfig({ path: configPath, envKeysFile: keysPath, quiet: true });
+      } else {
+        console.warn(`⚠️  Encrypted config found but keys file missing: ${keysPath}`);
+      }
+    } else {
+      // Plain JSON - parse and set environment variables
+      const config = JSON.parse(content);
+      Object.entries(config).forEach(([key, value]) => {
+        if (!process.env[key]) {
+          process.env[key] = String(value);
+        }
+      });
+    }
+  } catch (error) {
+    console.error(`Failed to load JSON config from ${configPath}:`, error.message);
+  }
+}
+
+/**
+ * Load configuration from available sources
+ * Priority: custom path > .env > config.json > ~/.canvas-scraper.*
+ */
+function loadConfiguration() {
+  const customPath = getCustomConfigPath();
+  const home = process.env.HOME || process.env.USERPROFILE;
+
+  if (customPath) {
+    // Custom config path specified
+    if (fs.existsSync(customPath)) {
+      if (customPath.endsWith(".json")) {
+        loadJsonConfig(customPath);
+      } else {
+        dotenvxConfig({ path: customPath, quiet: true });
+      }
+      return;
+    } else {
+      console.warn(`⚠️  Custom config path not found: ${customPath}`);
+    }
+  }
+
+  // Try standard locations in priority order
+  const configPaths = [
+    { path: ".env", type: "env" },
+    { path: "config.json", type: "json" },
+    { path: path.join(home, ".canvas-scraper.env"), type: "env" },
+    { path: path.join(home, ".canvas-scraper.json"), type: "json" },
+  ];
+
+  for (const { path: configPath, type } of configPaths) {
+    if (fs.existsSync(configPath)) {
+      if (type === "json") {
+        loadJsonConfig(configPath);
+      } else {
+        dotenvxConfig({ path: configPath, quiet: true });
+      }
+      return;
+    }
+  }
+
+  // If no config found, try loading from default .env locations (dotenvx will handle quietly)
+  dotenvxConfig({
+    quiet: true,
+    path: [".env", path.join(home, ".canvas-scraper.env")],
+  });
+}
+
+// Load configuration
+loadConfiguration();
 
 // Load environment variables from .env file if it exists
 const env_canvas_url = process.env.CANVAS_URL || "https://canvas.colorado.edu/";

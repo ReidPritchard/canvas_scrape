@@ -4,6 +4,7 @@ import logger from "./src/logger.js";
 import { scrapeCanvas } from "./src/canvas-scraper.js";
 import { exportToTodoist } from "./src/todoist-export.js";
 import { exportToNotion } from "./src/notion-export.js";
+import { runConfigWizard, checkConfigExists } from "./src/config-wizard.js";
 import crypto from "crypto";
 
 const { exportTo } = config;
@@ -30,6 +31,29 @@ const operationStats = {
   var myArgs = process.argv.slice(2);
   const isDev = myArgs[0] === "--dev";
   const skipScraping = myArgs.includes("--skip-scraping");
+  const runSetup = myArgs.includes("--setup");
+
+  // AIDEV-NOTE: Configuration wizard support for first-time setup
+  // Runs if --setup flag provided or no config file exists
+  if (runSetup) {
+    try {
+      await runConfigWizard();
+      process.exit(0);
+    } catch (error) {
+      console.error("Configuration wizard failed:", error.message);
+      process.exit(1);
+    }
+  }
+
+  // Check if config exists, offer to run wizard if not
+  const configStatus = checkConfigExists();
+  if (!configStatus.exists && !config.account.password) {
+    console.log("\n⚠️  No configuration file found.");
+    console.log("Run the configuration wizard to set up Canvas Scraper:\n");
+    console.log("  node main.js --setup\n");
+    console.log("Or create a .env file manually (see .env.example)\n");
+    process.exit(1);
+  }
 
   // AIDEV-NOTE: Session initialization for main application workflow
   sessionLogger.info("Starting Canvas scraping application", {
