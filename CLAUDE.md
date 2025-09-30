@@ -32,9 +32,12 @@ Key components:
 ```bash
 pnpm install                    # Install dependencies
 pnpm exec playwright install    # Install Playwright browsers
+pnpm run setup                  # Run interactive configuration wizard
+node main.js --setup            # Alternative way to run setup wizard
 node main.js                    # Run scraper in headless mode
 pnpm run dev                    # Run scraper with visible browser (--dev flag)
 pnpm run dev:skip-scraping      # Run with cached output.json (faster testing)
+node main.js --config /path     # Run with custom config file path
 pnpm test                       # Run test suite with vitest
 pnpm run test:watch             # Run tests in watch mode
 pnpm run test:ui                # Run tests with UI interface
@@ -45,9 +48,10 @@ pnpm run test:coverage          # Run tests with coverage report
 
 - Requires Playwright browser installation after dependency install
 - Uses ES modules (type: "module" in package.json)
-- Test framework: Vitest (configured but minimal tests implemented)
-- Configuration requires API keys for Todoist and Notion
-- `.env` file required for credentials (see `.env.example` template)
+- Test framework: Vitest (configured, comprehensive test coverage)
+- Configuration supports multiple formats: .env and JSON
+- Interactive setup wizard for first-time configuration
+- Supports custom config paths via CLI flag or environment variable
 
 ---
 
@@ -74,21 +78,23 @@ const verify_is_assignment = async (content) => {
 
 ## 4. Project Layout & Core Components
 
-| Directory/File          | Description                                              |
-| ----------------------- | -------------------------------------------------------- |
-| `main.js`               | Main orchestration and entry point with session tracking |
-| `config.js`             | Configuration loader with environment variable support   |
-| `src/canvas-scraper.js` | Canvas authentication and content extraction             |
-| `src/todoist-export.js` | Todoist API integration with REST API                    |
-| `src/notion-export.js`  | Notion API integration                                   |
-| `src/logger.js`         | Winston logging configuration                            |
-| `src/selectors.js`      | Centralized Canvas CSS selectors                         |
-| `src/error-handler.js`  | Shared error handling utilities                          |
-| `tests/`                | Vitest test suite (placeholder tests only)               |
-| `specs/`                | Feature specifications and proposals                     |
-| `.env.example`          | Environment variable template                            |
-| `output.json`           | Cached assignment data for testing                       |
-| `package.json`          | Dependencies and scripts                                 |
+| Directory/File            | Description                                                    |
+| ------------------------- | -------------------------------------------------------------- |
+| `main.js`                 | Main orchestration and entry point with session tracking       |
+| `setup.js`                | Standalone configuration wizard script                         |
+| `config.js`               | Configuration loader with multi-format and custom path support |
+| `src/config-wizard.js`    | Interactive setup wizard for first-time configuration          |
+| `src/canvas-scraper.js`   | Canvas authentication and content extraction                   |
+| `src/todoist-export.js`   | Todoist API integration with REST API                          |
+| `src/notion-export.js`    | Notion API integration                                         |
+| `src/logger.js`           | Winston logging configuration                                  |
+| `src/selectors.js`        | Centralized Canvas CSS selectors                               |
+| `src/error-handler.js`    | Shared error handling utilities                                |
+| `tests/`                  | Vitest test suite (comprehensive coverage)                     |
+| `tests/config-wizard.test.js` | Tests for configuration wizard and multi-format support    |
+| `.env.example`            | Environment variable template                                  |
+| `output.json`             | Cached assignment data for testing                             |
+| `package.json`            | Dependencies and scripts                                       |
 
 **Key domain models/concepts:**
 
@@ -484,6 +490,15 @@ These files should not be modified without explicit permission:
 
 ## 16. Recent Improvements (Last Updated: 2025-09-30)
 
+### Configuration System Enhancements (2025-09-30)
+
+- **Interactive Setup Wizard**: Full-featured CLI wizard for first-time configuration (`pnpm run setup`)
+- **Multi-Format Support**: Support for both .env and JSON configuration files
+- **Custom Config Paths**: Support for user-specified config paths via `--config` flag or `CONFIG_PATH` env var
+- **Automatic Config Detection**: Checks standard locations (.env, config.json, ~/.canvas-scraper.*)
+- **Guided Configuration**: Step-by-step wizard with validation, password masking, and encryption options
+- **Test Coverage**: Comprehensive tests for config wizard, JSON loading, and custom paths
+
 ### Encrypted .env File Support (2025-09-30)
 
 - **Dotenvx Integration**: Replaced standard `dotenv` with `@dotenvx/dotenvx` for encrypted .env support
@@ -510,6 +525,7 @@ These files should not be modified without explicit permission:
 - **Vitest Integration**: Configured test framework with watch mode, UI, and coverage
 - **Test Scripts**: Added comprehensive test commands to package.json
 - **Config Tests**: Test coverage for both plain and encrypted .env files
+- **Wizard Tests**: Full test coverage for configuration wizard functionality
 
 ### Best Practices Discovered
 
@@ -517,6 +533,8 @@ These files should not be modified without explicit permission:
 - **Empty Update Prevention**: Check for meaningful changes before API calls
 - **Caching Strategy**: Use output.json for faster development iteration
 - **Environment Variables**: Prefer `.env` over hardcoded config values
+- **User Experience**: Provide interactive setup for better onboarding
+- **Config Flexibility**: Support multiple config formats and locations for user convenience
 - **Encryption Security**: Never commit `.env.keys` files to version control
 
 ---

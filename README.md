@@ -58,6 +58,30 @@ pnpm exec playwright install
 
 ### Configuration
 
+Canvas Scraper supports multiple configuration methods for your convenience:
+
+#### Option 1: Interactive Setup Wizard (Recommended for First-Time Users)
+
+The easiest way to get started is using the interactive configuration wizard:
+
+```bash
+# Run the setup wizard
+pnpm run setup
+# or
+node main.js --setup
+# or
+node setup.js
+```
+
+The wizard will guide you through:
+- Choosing a configuration format (.env or JSON)
+- Setting your Canvas LMS credentials
+- Configuring optional Todoist integration
+- Configuring optional Notion integration
+- Optionally encrypting your configuration for security
+
+#### Option 2: Manual Configuration
+
 **Step 1: Create .env file**
 
 Copy the example template and add your credentials:
@@ -107,9 +131,51 @@ The application automatically detects and decrypts encrypted `.env` files when t
 - The `.env.keys` file is already git-ignored for your safety
 - Share the `.env.keys` file securely with team members who need access
 
+#### Custom Configuration Paths
+
+Canvas Scraper supports custom configuration file locations:
+
+**Using Environment Variable:**
+```bash
+CONFIG_PATH=/path/to/your/config.json node main.js
+```
+
+**Using CLI Flag:**
+```bash
+node main.js --config /path/to/your/config.json
+```
+
+**Standard Configuration Locations** (checked in order):
+1. `./config.json` or `./.env` (current directory)
+2. `~/.canvas-scraper.json` or `~/.canvas-scraper.env` (home directory)
+
+#### JSON Configuration Format
+
+Alternatively, you can use a JSON config file instead of .env:
+
+```json
+{
+  "CANVAS_URL": "https://canvas.colorado.edu/",
+  "CANVAS_USERNAME": "your_username",
+  "CANVAS_PWD": "your_password",
+  "TODOIST_EXPORT": "true",
+  "TODOIST_API_KEY": "your_todoist_api_key",
+  "NOTION_EXPORT": "false",
+  "NOTION_API_KEY": "",
+  "NOTION_DATABASE_ID": ""
+}
+```
+
+Save as `config.json` in the project root or use a custom path.
+
 ### Usage
 
 ```bash
+# Run configuration wizard (first-time setup)
+pnpm run setup
+# or
+node main.js --setup
+
 # Run in production mode (headless)
 node main.js
 
@@ -118,6 +184,11 @@ pnpm run dev
 
 # Run with cached data (faster testing, no Canvas scraping)
 pnpm run dev:skip-scraping
+
+# Use custom config file
+node main.js --config /path/to/config.json
+# or
+CONFIG_PATH=/path/to/config.json node main.js
 ```
 
 ## Logging Configuration
@@ -480,11 +551,13 @@ Run `node src/performance-test.js` to validate performance metrics.
 ### Recently Completed
 
 - ✅ **Encrypted Credentials**: Integration with `@dotenvx/dotenvx` for encrypted `.env` files
+- ✅ **Interactive Setup Wizard**: CLI wizard for easy configuration with support for multiple formats
+- ✅ **Custom Config Paths**: Support for user-specified configuration file locations
+- ✅ **JSON Config Format**: Alternative to .env format with encryption support
 - ✅ **Automated Releases**: GitHub Action workflow for packaging executables (macOS, Linux, Windows)
 
 ### Planned Features
 
-- 🔄 **Interactive Setup Wizard**: CLI wizard for `.env` configuration (see `specs/feat-interactive-config-setup.md`)
 - 🔄 **Comprehensive Tests**: Full unit and integration test coverage
 - 🔄 **Performance Optimization**: Canvas scraping performance improvements
 
