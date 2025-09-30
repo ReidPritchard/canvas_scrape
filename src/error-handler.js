@@ -16,10 +16,10 @@ export const createErrorHandler = (context, sessionId, operationStats) => {
     }
     if (operationStats && operationStats.apiStats) {
       // Update API-specific error counts
-      if (context.includes('todoist') && operationStats.apiStats.todoist) {
+      if (context.includes("todoist") && operationStats.apiStats.todoist) {
         operationStats.apiStats.todoist.errors++;
       }
-      if (context.includes('notion') && operationStats.apiStats.notion) {
+      if (context.includes("notion") && operationStats.apiStats.notion) {
         operationStats.apiStats.notion.errors++;
       }
     }
@@ -32,7 +32,7 @@ export const createErrorHandler = (context, sessionId, operationStats) => {
       errorType: error.constructor.name,
       stack: error.stack,
       operation,
-      timestamp: Date.now()
+      timestamp: Date.now(),
     });
 
     // AIDEV-NOTE: Always re-throw for caller handling - maintains consistent error propagation
@@ -51,7 +51,8 @@ export const createWarningHandler = (context, sessionId, operationStats) => {
   return (operation) => (error) => {
     // AIDEV-NOTE: Update statistics but don't increment critical error counts
     if (operationStats && operationStats.scrapingStats) {
-      operationStats.scrapingStats.warnings = (operationStats.scrapingStats.warnings || 0) + 1;
+      operationStats.scrapingStats.warnings =
+        (operationStats.scrapingStats.warnings || 0) + 1;
     }
 
     // AIDEV-NOTE: Log as warning instead of error for non-critical failures
@@ -62,7 +63,7 @@ export const createWarningHandler = (context, sessionId, operationStats) => {
       errorType: error.constructor.name,
       operation,
       timestamp: Date.now(),
-      recoverable: true
+      recoverable: true,
     });
 
     // AIDEV-NOTE: Return null or default value instead of throwing

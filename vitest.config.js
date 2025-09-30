@@ -1,5 +1,5 @@
 // AIDEV-NOTE: Vitest configuration for Canvas scraper integration tests
-import { defineConfig } from 'vitest/config';
+import { defineConfig } from "vitest/config";
 
 export default defineConfig({
   test: {
@@ -8,24 +8,24 @@ export default defineConfig({
     // Set test timeout for Canvas scraper tests (some may take longer due to browser automation)
     testTimeout: 10000,
     // Environment configuration
-    environment: 'node',
+    environment: "node",
     // Global test setup
     globals: true,
     // Coverage configuration (optional)
     coverage: {
-      provider: 'v8',
-      include: ['src/**/*.js'],
-      exclude: ['tests/**', 'node_modules/**']
+      provider: "v8",
+      include: ["src/**/*.js"],
+      exclude: ["tests/**", "node_modules/**"],
     },
     // Reporter configuration for cleaner output
-    reporter: ['verbose'],
+    reporter: ["verbose"],
     // Handle Winston logger warnings in test environment
     onConsoleLog: (log) => {
       // Suppress Winston "no transports" warnings during tests
-      if (log.includes('[winston] Attempt to write logs with no transports')) {
+      if (log.includes("[winston] Attempt to write logs with no transports")) {
         return false;
       }
       return true;
-    }
-  }
+    },
+  },
 });

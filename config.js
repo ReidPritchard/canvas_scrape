@@ -1,4 +1,5 @@
 import dotenv from "dotenv";
+// FIXME; Use dotenvx for encrypted .env files
 
 // Load environment variables from .env file if it exists
 dotenv.config();
@@ -8,6 +9,7 @@ const env_canvas_pwd = process.env.CANVAS_PWD || "";
 
 const env_notion_api_key = process.env.NOTION_API_KEY || "";
 const env_notion_db_id = process.env.NOTION_DB_ID || "";
+const env_notion_export = process.env.NOTION_EXPORT === "true" || false;
 
 const env_todoist_api_key = process.env.TODOIST_API_KEY || "";
 const env_todoist_export = process.env.TODOIST_EXPORT === "true" || false;
@@ -31,6 +33,6 @@ export default {
 
   exportTo: {
     todoist: env_todoist_export,
-    notion: false,
+    notion: env_notion_export,
   },
 };

@@ -71,7 +71,6 @@ export async function exportToTodoist(
       throw stateError;
     }
 
-    // AIDEV-NOTE: Fixed async forEach race condition - using for-of loop for proper sequential processing
     for (const item of assignments) {
       try {
         // AIDEV-NOTE: Todoist item duplication check logging
@@ -87,7 +86,6 @@ export async function exportToTodoist(
         try {
           previous_item = await checkIfAlreadyAdded(current_items, item);
 
-          // AIDEV-NOTE: Todoist item check results logging (updated for REST API)
           logger.debug("Todoist item check completed", {
             context: "todoist_export",
             sessionId: sessionId,
@@ -112,7 +110,6 @@ export async function exportToTodoist(
           previous_item = false; // Assume it's new if check fails
         }
 
-        // AIDEV-NOTE: Updated to use REST API isCompleted property instead of completed_date
         if (previous_item && previous_item.isCompleted) {
           // If previous item has already been completed don't update it
           // AIDEV-NOTE: Replaced console.log with structured logging for completed assignments
@@ -144,14 +141,19 @@ export async function exportToTodoist(
             project_id = false; // Use default project
           }
 
-          // AIDEV-NOTE: Updated to use REST API camelCase property names and structure
+          // AIDEV-NOTE: Clean date string by removing "Due: " prefix that Canvas adds to assignments
+          const cleanedDueDate = item.due_date?.string?.replace(
+            /^Due:\s*/i,
+            "",
+          );
           const data = {
             ...(item.title && { content: item.title }),
             ...(project_id && { projectId: project_id }),
             // Convert due date object to dueString for natural language processing
-            ...(item.due_date?.string && { dueString: item.due_date.string }),
+            ...(cleanedDueDate && { dueString: cleanedDueDate }),
             ...(item.description && {
               description: `${item.description}\n\n[Canvas Link](${item.url})`,
+              labels: [item.class_name, item.type],
             }),
             priority: 3,
           };
@@ -204,58 +206,73 @@ export async function exportToTodoist(
               });
             }
           } else {
-            // AIDEV-NOTE: Todoist update operation logging with item details
-            logger.info("Updating existing Todoist item", {
-              context: "todoist_export",
-              sessionId: sessionId,
-              title: item.title,
-              dueDate: item.due_date?.string,
-              itemId: previous_item.id,
-              hasDescription: !!item.description,
-              action: "update",
-            });
-
+            // AIDEV-NOTE: Build update data with Canvas link appended to description
             const updateData = {
-              ...(item.description && { description: item.description }),
+              ...(item.description && {
+                description: `${item.description}\n\n[Canvas Link](${item.url})`,
+              }),
             };
 
-            try {
-              const startTime = Date.now();
-              // AIDEV-NOTE: Updated to use updateTask() instead of deprecated items.update()
-              const updateResult = await todoistApi.updateTask(
-                previous_item.id,
-                updateData,
-              );
-              const endTime = Date.now();
-
-              operationStats.apiStats.todoist.updates++;
-
-              // AIDEV-NOTE: Todoist update operation completion logging with timing and session tracking
-              logger.info("Todoist item updated successfully", {
+            // AIDEV-NOTE: Skip update if there's nothing to update (e.g., quizzes without descriptions)
+            if (Object.keys(updateData).length === 0) {
+              logger.info("Skipping update - no changes needed", {
                 context: "todoist_export",
                 sessionId: sessionId,
                 title: item.title,
                 itemId: previous_item.id,
-                duration: endTime - startTime,
-                action: "update_complete",
-                apiStats: operationStats.apiStats.todoist,
+                reason: "No description to add",
+                action: "update_skipped",
               });
-            } catch (e) {
-              operationStats.apiStats.todoist.errors++;
-
-              // AIDEV-NOTE: Todoist API error logging for update operations with session tracking
-              logger.error("Todoist API error during item update", {
+            } else {
+              // AIDEV-NOTE: Todoist update operation logging with item details
+              logger.info("Updating existing Todoist item", {
                 context: "todoist_export",
                 sessionId: sessionId,
-                error: e.message,
-                errorType: e.constructor.name,
-                assignmentTitle: item.title,
-                itemId: previous_item.id,
+                title: item.title,
                 dueDate: item.due_date?.string,
-                stack: e.stack,
-                action: "update_error",
-                apiStats: operationStats.apiStats.todoist,
+                itemId: previous_item.id,
+                hasDescription: !!item.description,
+                action: "update",
               });
+
+              try {
+                const startTime = Date.now();
+                // AIDEV-NOTE: Updated to use updateTask() instead of deprecated items.update()
+                const updateResult = await todoistApi.updateTask(
+                  previous_item.id,
+                  updateData,
+                );
+                const endTime = Date.now();
+
+                operationStats.apiStats.todoist.updates++;
+
+                // AIDEV-NOTE: Todoist update operation completion logging with timing and session tracking
+                logger.info("Todoist item updated successfully", {
+                  context: "todoist_export",
+                  sessionId: sessionId,
+                  title: item.title,
+                  itemId: updateResult.id,
+                  duration: endTime - startTime,
+                  action: "update_complete",
+                  apiStats: operationStats.apiStats.todoist,
+                });
+              } catch (e) {
+                operationStats.apiStats.todoist.errors++;
+
+                // AIDEV-NOTE: Todoist API error logging for update operations with session tracking
+                logger.error("Todoist API error during item update", {
+                  context: "todoist_export",
+                  sessionId: sessionId,
+                  error: e.message,
+                  errorType: e.constructor.name,
+                  assignmentTitle: item.title,
+                  itemId: previous_item.id,
+                  dueDate: item.due_date?.string,
+                  stack: e.stack,
+                  action: "update_error",
+                  apiStats: operationStats.apiStats.todoist,
+                });
+              }
             }
           }
         }
@@ -348,7 +365,7 @@ async function checkIfAlreadyAdded(items, given_item) {
  */
 async function findRelatedProject(projects, class_name, sessionId) {
   try {
-    const cleaned_class_name = await cleanName(class_name.toLowerCase());
+    const cleaned_class_name = cleanName(class_name.toLowerCase());
 
     // AIDEV-NOTE: Project lookup logging with class name matching
     logger.debug("Looking up related project", {
@@ -392,21 +409,20 @@ async function findRelatedProject(projects, class_name, sessionId) {
 }
 
 /**
- * Clean a string by removing non-alphabetic characters
+ * Clean a string for project matching
  * @param {string} string - String to clean
- * @returns {Promise<string>} - Cleaned string
+ * @returns {string} - Cleaned string
+ *
+ * @example
+ * "ATLS 5420-001" -> "atls 5420"
  */
-async function cleanName(string) {
-  try {
-    return string.replace(/[^a-zA-Z]/g, "");
-  } catch (error) {
-    // AIDEV-NOTE: String cleaning error with fallback
-    logger.warn("String cleaning failed, returning original", {
-      context: "utility",
-      error: error.message,
-      originalString: string,
-      operation: "string_cleaning",
-    });
-    return string; // Return original string if cleaning fails
-  }
+function cleanName(string) {
+  let cleaned = string
+    .toLowerCase()
+    .replace(/[^a-z0-9\s]/g, "") // Remove special characters
+    .replace(/\s+/g, " ") // Replace multiple spaces with single space
+    .trim() // Trim leading/trailing spaces
+    .replace(/\s(-|section)\s.*$/, "") // Remove section identifiers like " - 001" or " section 001"
+    .replace(/\s\d{3,}$/, ""); // Remove trailing numbers (e.g. " 5420")
+  return cleaned;
 }

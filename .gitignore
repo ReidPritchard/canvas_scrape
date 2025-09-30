@@ -1,5 +1,6 @@
 
 # Simple Task Master - User tasks are git-ignored
+.simple-task-master/
 .simple-task-master/tasks/
 .simple-task-master/lock
 .claude
@@ -8,8 +9,11 @@ node_modules
 .env
 logs
 
+specs
+
 # Build artifacts
 dist/
 output.json
 main-*
 *.exe
+

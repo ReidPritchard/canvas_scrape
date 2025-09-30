@@ -11,7 +11,12 @@ import logger from "./logger.js";
  * @param {Object} operationStats - Statistics object to track API operations
  * @returns {Promise<void>}
  */
-export async function exportToNotion(assignments, config, sessionId, operationStats) {
+export async function exportToNotion(
+  assignments,
+  config,
+  sessionId,
+  operationStats,
+) {
   // AIDEV-NOTE: Skip Notion export if no API key configured
   if (!config.notion_api_key && !process.env.NOTION_TOKEN) {
     logger.info("Notion export skipped - no API key configured", {

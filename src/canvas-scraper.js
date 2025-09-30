@@ -301,7 +301,7 @@ const navigateToPlanner = async (page, config, operationStats) => {
 
   try {
     // Navigate to dashboard if needed
-    const href = await page.evaluate(() => document.location.href);
+    const href = await page.url();
 
     if (href != url) {
       // AIDEV-NOTE: Dashboard navigation
@@ -377,13 +377,11 @@ const scrapeCanvasItems = async (page, context, config, operationStats) => {
   let item_links;
   try {
     // AIDEV-NOTE: Item discovery and Canvas state capture
-    const preDiscoveryState = await page.evaluate(async () => {
-      return {
-        url: document.location.href,
-        title: document.title,
-        timestamp: Date.now(),
-      };
-    });
+    const preDiscoveryState = {
+      url: page.url(),
+      title: await page.title().catch(() => "Unknown"),
+      timestamp: Date.now(),
+    };
 
     // Next find every planner day that contains elements
     item_links = await page.$$(SELECTORS.planner.items);

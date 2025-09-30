@@ -72,8 +72,9 @@ const operationStats = {
     if (notion)
       await exportToNotion(assignments, config, SESSION_ID, operationStats);
 
-    if (!(todoist || notion))
-      fs.writeFileSync("output.json", JSON.stringify(assignments, null, 2));
+    // if (!(todoist || notion))
+    // always export to JSON for debugging and caching
+    fs.writeFileSync("output.json", JSON.stringify(assignments, null, 2));
 
     // AIDEV-NOTE: Application completion logging
     logger.info("Canvas scraping application completed successfully", {
