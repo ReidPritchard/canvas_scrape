@@ -27,10 +27,10 @@ describe("Config Module", () => {
 
     // Import dotenvx config
     const { config } = await import("@dotenvx/dotenvx");
-    const result = config({ path: testEnvPath });
+    config({ path: testEnvPath, quiet: true });
 
-    expect(result.parsed).toBeDefined();
-    expect(result.parsed.TEST_VAR).toBe("plain_value");
+    // AIDEV-NOTE: dotenvx sets environment variables directly, unlike standard dotenv
+    expect(process.env.TEST_VAR).toBe("plain_value");
   });
 
   it("should support encrypted .env files", async () => {
@@ -39,7 +39,7 @@ describe("Config Module", () => {
 
     // Encrypt it using dotenvx CLI
     try {
-      execSync(`npx dotenvx encrypt -f ${testEnvPath}`, {
+      execSync(`npx @dotenvx/dotenvx encrypt -f ${testEnvPath}`, {
         stdio: "pipe",
       });
 
@@ -49,13 +49,14 @@ describe("Config Module", () => {
 
       // Import dotenvx config and load encrypted file
       const { config } = await import("@dotenvx/dotenvx");
-      const result = config({
+      config({
         path: testEnvPath,
         envKeysFile: testEnvKeysPath,
+        quiet: true,
       });
 
-      expect(result.parsed).toBeDefined();
-      expect(result.parsed.TEST_VAR).toBe("secret_value");
+      // AIDEV-NOTE: dotenvx sets environment variables directly, unlike standard dotenv
+      expect(process.env.TEST_VAR).toBe("secret_value");
     } catch (error) {
       // Skip test if dotenvx encryption fails (e.g., in CI environments)
       console.log("Skipping encryption test:", error.message);

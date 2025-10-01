@@ -1,127 +1,11 @@
-import readline from "readline";
 import fs from "fs";
 import path from "path";
-import { fileURLToPath } from "url";
 import { execSync } from "child_process";
-
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
+import { input, confirm, password } from "@inquirer/prompts";
 
 // AIDEV-NOTE: Interactive configuration wizard for first-time setup
-// Guides users through Canvas scraper configuration with validation
+// Refactored to use @inquirer/prompts for better UX and maintainability
 // Supports both .env and JSON config formats with encryption options
-
-/**
- * Create readline interface for user input
- */
-function createInterface() {
-  return readline.createInterface({
-    input: process.stdin,
-    output: process.stdout,
-  });
-}
-
-/**
- * Prompt user for input with optional default value
- * @param {readline.Interface} rl - Readline interface
- * @param {string} question - Question to ask
- * @param {string} defaultValue - Default value (optional)
- * @returns {Promise<string>} User's answer
- */
-function question(rl, question, defaultValue = "") {
-  return new Promise((resolve) => {
-    const prompt = defaultValue
-      ? `${question} (default: ${defaultValue}): `
-      : `${question}: `;
-    rl.question(prompt, (answer) => {
-      resolve(answer.trim() || defaultValue);
-    });
-  });
-}
-
-/**
- * Prompt user for yes/no question
- * @param {readline.Interface} rl - Readline interface
- * @param {string} question - Question to ask
- * @param {boolean} defaultValue - Default value (true/false)
- * @returns {Promise<boolean>} User's answer as boolean
- */
-function questionYesNo(rl, question, defaultValue = false) {
-  return new Promise((resolve) => {
-    const defaultStr = defaultValue ? "Y/n" : "y/N";
-    rl.question(`${question} (${defaultStr}): `, (answer) => {
-      const trimmed = answer.trim().toLowerCase();
-      if (trimmed === "") {
-        resolve(defaultValue);
-      } else {
-        resolve(trimmed === "y" || trimmed === "yes");
-      }
-    });
-  });
-}
-
-/**
- * Mask password input (basic implementation)
- * @param {readline.Interface} rl - Readline interface
- * @param {string} question - Question to ask
- * @returns {Promise<string>} User's password
- */
-function questionPassword(rl, question) {
-  return new Promise((resolve) => {
-    process.stdout.write(`${question}: `);
-    
-    const stdin = process.stdin;
-    
-    // AIDEV-NOTE: Check for TTY support before enabling raw mode
-    // Fallback to visible input in non-TTY environments (CI/CD, Docker, etc.)
-    if (!stdin.isTTY) {
-      console.warn("\n⚠️  Password will be visible (no TTY detected)");
-      return rl.question("", (answer) => {
-        resolve(answer.trim());
-      });
-    }
-    
-    // Hide input temporarily in TTY environments
-    stdin.setRawMode(true);
-    stdin.resume();
-    stdin.setEncoding("utf8");
-
-    let password = "";
-    const onData = (char) => {
-      char = char.toString("utf8");
-      switch (char) {
-        case "\n":
-        case "\r":
-        case "\u0004": // Ctrl+D
-          stdin.setRawMode(false);
-          stdin.pause();
-          stdin.removeListener("data", onData);
-          process.stdout.write("\n");
-          resolve(password);
-          break;
-        case "\u0003": // Ctrl+C
-          process.stdout.write("\n");
-          process.exit(0);
-          break;
-        case "\u007f": // Backspace
-        case "\b":
-          if (password.length > 0) {
-            password = password.slice(0, -1);
-            process.stdout.clearLine(0);
-            process.stdout.cursorTo(0);
-            process.stdout.write(`${question}: ${"*".repeat(password.length)}`);
-          }
-          break;
-        default:
-          password += char;
-          process.stdout.write("*");
-          break;
-      }
-    };
-
-    stdin.on("data", onData);
-  });
-}
 
 /**
  * Validate URL format
@@ -144,7 +28,17 @@ function isValidUrl(url) {
  * @returns {Promise<object>} Configuration object
  */
 export async function runConfigWizard(configPath = null, format = null) {
-  const rl = createInterface();
+  // AIDEV-NOTE: Detect non-TTY environments and provide helpful error
+  // @inquirer/prompts requires a TTY and will crash in CI/CD or piped input
+  if (!process.stdin.isTTY) {
+    throw new Error(
+      "Interactive wizard requires a terminal (TTY).\n" +
+      "To use in non-interactive environments:\n" +
+      "  1. Create config file manually (see .env.example)\n" +
+      "  2. Use environment variables\n" +
+      "  3. Provide pre-configured config file via --config flag"
+    );
+  }
 
   console.log("\n╔════════════════════════════════════════════════════╗");
   console.log("║   Canvas Scraper - Configuration Wizard           ║");
@@ -157,8 +51,11 @@ export async function runConfigWizard(configPath = null, format = null) {
       console.log("Configuration Format:");
       console.log("  1) .env file (recommended, supports encryption)");
       console.log("  2) JSON file (supports encryption)\n");
-      
-      const formatChoice = await question(rl, "Choose format (1 or 2)", "1");
+
+      const formatChoice = await input({
+        message: "Choose format (1 or 2)",
+        default: "1",
+      });
       format = formatChoice === "2" ? "json" : "env";
     }
 
@@ -169,17 +66,19 @@ export async function runConfigWizard(configPath = null, format = null) {
       console.log("  2) Home directory (~/.canvas-scraper.env or ~/.canvas-scraper.json)");
       console.log("  3) Custom path\n");
 
-      const locationChoice = await question(rl, "Choose location (1, 2, or 3)", "1");
-      
+      const locationChoice = await input({
+        message: "Choose location (1, 2, or 3)",
+        default: "1",
+      });
+
       if (locationChoice === "3") {
-        configPath = await question(
-          rl,
-          "Enter custom config file path",
-          format === "json" ? "./config.json" : "./.env"
-        );
+        configPath = await input({
+          message: "Enter custom config file path",
+          default: format === "json" ? "./config.json" : "./.env",
+        });
       } else if (locationChoice === "2") {
         const home = process.env.HOME || process.env.USERPROFILE;
-        configPath = format === "json" 
+        configPath = format === "json"
           ? path.join(home, ".canvas-scraper.json")
           : path.join(home, ".canvas-scraper.env");
       } else {
@@ -194,33 +93,47 @@ export async function runConfigWizard(configPath = null, format = null) {
 
     let canvasUrl;
     do {
-      canvasUrl = await question(
-        rl,
-        "Canvas URL",
-        "https://canvas.colorado.edu/"
-      );
+      canvasUrl = await input({
+        message: "Canvas URL",
+        default: "https://canvas.colorado.edu/",
+      });
       if (!isValidUrl(canvasUrl)) {
         console.log("❌ Invalid URL format. Please enter a valid URL.\n");
       }
     } while (!isValidUrl(canvasUrl));
 
-    const canvasUsername = await question(rl, "Canvas Username");
-    const canvasPassword = await questionPassword(rl, "Canvas Password");
+    const canvasUsername = await input({
+      message: "Canvas Username",
+    });
+
+    // AIDEV-NOTE: Validate password is not empty before proceeding
+    let canvasPassword;
+    do {
+      canvasPassword = await password({
+        message: "Canvas Password",
+        mask: "*",
+      });
+      if (!canvasPassword || canvasPassword.trim().length === 0) {
+        console.log("❌ Password cannot be empty. Please try again.\n");
+      }
+    } while (!canvasPassword || canvasPassword.trim().length === 0);
 
     // Step 4: Todoist Integration (Optional)
     console.log("\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
     console.log("Todoist Integration (Optional)");
     console.log("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n");
 
-    const enableTodoist = await questionYesNo(
-      rl,
-      "Enable Todoist export?",
-      false
-    );
+    const enableTodoist = await confirm({
+      message: "Enable Todoist export?",
+      default: false,
+    });
+
     let todoistApiKey = "";
     if (enableTodoist) {
       console.log("Get your API key from: https://todoist.com/prefs/integrations");
-      todoistApiKey = await question(rl, "Todoist API Key");
+      todoistApiKey = await input({
+        message: "Todoist API Key",
+      });
     }
 
     // Step 5: Notion Integration (Optional)
@@ -228,13 +141,21 @@ export async function runConfigWizard(configPath = null, format = null) {
     console.log("Notion Integration (Optional)");
     console.log("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n");
 
-    const enableNotion = await questionYesNo(rl, "Enable Notion export?", false);
+    const enableNotion = await confirm({
+      message: "Enable Notion export?",
+      default: false,
+    });
+
     let notionApiKey = "";
     let notionDatabaseId = "";
     if (enableNotion) {
       console.log("Get your API key from: https://www.notion.so/my-integrations");
-      notionApiKey = await question(rl, "Notion API Key");
-      notionDatabaseId = await question(rl, "Notion Database ID");
+      notionApiKey = await input({
+        message: "Notion API Key",
+      });
+      notionDatabaseId = await input({
+        message: "Notion Database ID",
+      });
     }
 
     // Step 6: Encryption Option
@@ -244,21 +165,19 @@ export async function runConfigWizard(configPath = null, format = null) {
 
     // AIDEV-NOTE: Encryption should be strongly recommended for configs with passwords
     // Default to true and warn if user opts out
-    let enableEncryption = await questionYesNo(
-      rl,
-      "Encrypt configuration file? (strongly recommended)",
-      true
-    );
+    let enableEncryption = await confirm({
+      message: "Encrypt configuration file? (strongly recommended)",
+      default: true,
+    });
 
     // Add explicit warning if user declines encryption with password present
     if (!enableEncryption && canvasPassword) {
       console.log("\n⚠️  WARNING: Your password will be stored in PLAIN TEXT!");
       console.log("   Anyone with access to the config file can read your password.");
-      const confirmPlain = await questionYesNo(
-        rl,
-        "Are you sure you want to continue without encryption?",
-        false
-      );
+      const confirmPlain = await confirm({
+        message: "Are you sure you want to continue without encryption?",
+        default: false,
+      });
       if (!confirmPlain) {
         enableEncryption = true;
         console.log("✅ Encryption enabled for security.");
@@ -301,7 +220,7 @@ export async function runConfigWizard(configPath = null, format = null) {
       if (enableEncryption) {
         try {
           console.log("\n🔒 Encrypting configuration file...");
-          execSync(`npx dotenvx encrypt -f ${configPath}`, {
+          execSync(`npx @dotenvx/dotenvx encrypt -f ${configPath}`, {
             stdio: "inherit",
           });
           console.log("✅ Configuration encrypted successfully");
@@ -310,7 +229,7 @@ export async function runConfigWizard(configPath = null, format = null) {
           console.log(
             "⚠️  Encryption failed. Configuration saved unencrypted."
           );
-          console.log("   You can encrypt it later with: npx dotenvx encrypt");
+          console.log("   You can encrypt it later with: npx @dotenvx/dotenvx encrypt");
         }
       }
     } else {
@@ -325,7 +244,7 @@ export async function runConfigWizard(configPath = null, format = null) {
       if (enableEncryption) {
         try {
           console.log("\n🔒 Encrypting configuration file...");
-          execSync(`npx dotenvx encrypt -f ${configPath}`, {
+          execSync(`npx @dotenvx/dotenvx encrypt -f ${configPath}`, {
             stdio: "inherit",
           });
           console.log("✅ Configuration encrypted successfully");
@@ -334,7 +253,7 @@ export async function runConfigWizard(configPath = null, format = null) {
           console.log(
             "⚠️  Encryption failed. Configuration saved unencrypted."
           );
-          console.log("   You can encrypt it later with: npx dotenvx encrypt");
+          console.log("   You can encrypt it later with: npx @dotenvx/dotenvx encrypt");
         }
       }
     }
@@ -352,10 +271,17 @@ export async function runConfigWizard(configPath = null, format = null) {
       console.log("    or use --config flag when running.\n");
     }
 
-    rl.close();
     return { configPath, format, config };
   } catch (error) {
-    rl.close();
+    // AIDEV-NOTE: Distinguish between user cancellation (Ctrl+C) and actual errors
+    // @inquirer/prompts throws ExitPromptError or 'User force closed' on cancellation
+    if (error.name === 'ExitPromptError' || error.message.includes('User force closed')) {
+      console.log("\n\n⚠️  Configuration wizard cancelled by user.");
+      process.exit(0);
+    }
+
+    // Re-throw actual errors with context
+    console.error("\n❌ Configuration wizard encountered an error:");
     throw error;
   }
 }

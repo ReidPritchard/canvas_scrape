@@ -151,7 +151,7 @@ const createLogger = () => {
   if (transports.length === 0) {
     transports.push(
       new winston.transports.Console({
-        level: "error",
+        level: "warn",
         format: combine(timestamp(), json()),
         silent: false,
       }),

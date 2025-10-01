@@ -146,6 +146,7 @@ export async function exportToTodoist(
             /^Due:\s*/i,
             "",
           );
+          const cleaned_class_name = cleanName(class_name.toLowerCase());
           const data = {
             ...(item.title && { content: item.title }),
             ...(project_id && { projectId: project_id }),
@@ -153,7 +154,7 @@ export async function exportToTodoist(
             ...(cleanedDueDate && { dueString: cleanedDueDate }),
             ...(item.description && {
               description: `${item.description}\n\n[Canvas Link](${item.url})`,
-              labels: [item.class_name, item.type],
+              labels: [cleaned_class_name, item.type],
             }),
             priority: 3,
           };
@@ -172,7 +173,6 @@ export async function exportToTodoist(
 
             try {
               const startTime = Date.now();
-              // AIDEV-NOTE: Updated to use addTask() instead of deprecated items.add()
               const addResult = await todoistApi.addTask(data);
               const endTime = Date.now();
 

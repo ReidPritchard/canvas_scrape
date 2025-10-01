@@ -43,19 +43,21 @@ function loadJsonConfig(configPath) {
       if (fs.existsSync(keysPath)) {
         dotenvxConfig({ path: configPath, envKeysFile: keysPath, quiet: true });
       } else {
-        console.warn(`⚠️  Encrypted config found but keys file missing: ${keysPath}`);
+        console.warn(
+          `⚠️  Encrypted config found but keys file missing: ${keysPath}`,
+        );
       }
     } else {
       // Plain JSON - parse and validate structure
       const config = JSON.parse(content);
-      
+
       // AIDEV-NOTE: Validate required configuration fields
       const required = ["CANVAS_URL", "CANVAS_USERNAME", "CANVAS_PWD"];
-      const missing = required.filter(key => !config[key]);
+      const missing = required.filter((key) => !config[key]);
       if (missing.length > 0) {
         throw new Error(`Missing required fields: ${missing.join(", ")}`);
       }
-      
+
       // Set environment variables
       Object.entries(config).forEach(([key, value]) => {
         if (!process.env[key]) {
@@ -64,7 +66,10 @@ function loadJsonConfig(configPath) {
       });
     }
   } catch (error) {
-    console.error(`Failed to load JSON config from ${configPath}:`, error.message);
+    console.error(
+      `Failed to load JSON config from ${configPath}:`,
+      error.message,
+    );
   }
 }
 
@@ -99,7 +104,7 @@ function loadConfiguration() {
   ];
 
   for (const { path: configPath, type } of configPaths) {
-    if (fs.existsSync(configPath)) {
+    if (!!configPath && fs.existsSync(configPath)) {
       if (type === "json") {
         loadJsonConfig(configPath);
       } else {
@@ -109,11 +114,15 @@ function loadConfiguration() {
     }
   }
 
-  // If no config found, try loading from default .env locations (dotenvx will handle quietly)
-  dotenvxConfig({
-    quiet: true,
-    path: [".env", path.join(home, ".canvas-scraper.env")],
-  });
+  // If no config found, try loading from default .env locations
+  try {
+    dotenvxConfig({
+      quiet: true,
+      path: [".env", path.join(home, ".canvas-scraper.env")],
+    });
+  } catch (error) {
+    console.error("Failed to load default .env configuration:", error.message);
+  }
 }
 
 // Load configuration

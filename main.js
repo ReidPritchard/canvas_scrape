@@ -33,25 +33,33 @@ const operationStats = {
   const skipScraping = myArgs.includes("--skip-scraping");
   const runSetup = myArgs.includes("--setup");
 
-  // AIDEV-NOTE: Configuration wizard support for first-time setup
-  // Runs if --setup flag provided or no config file exists
-  if (runSetup) {
+  // AIDEV-NOTE: Check for existing configuration before proceeding
+  let configStatus = checkConfigExists();
+
+  // AIDEV-NOTE: Run wizard if explicitly requested or no config exists
+  if (runSetup || (!configStatus.exists && !config.account.password)) {
+    if (!runSetup) {
+      // Auto-trigger wizard only if no config AND no password from env vars
+      console.log("\n⚠️  No configuration file found.");
+      console.log("Starting interactive configuration wizard...\n");
+    }
+
     try {
       await runConfigWizard();
+      console.log(
+        "\n✅ Configuration completed please re-run the application.",
+      );
       process.exit(0);
     } catch (error) {
-      console.error("Configuration wizard failed:", error.message);
+      console.error("\n❌ Configuration wizard failed:", error.message);
       process.exit(1);
     }
   }
 
-  // Check if config exists, offer to run wizard if not
-  const configStatus = checkConfigExists();
+  // Final validation that config exists after wizard (if run)
   if (!configStatus.exists && !config.account.password) {
-    console.log("\n⚠️  No configuration file found.");
-    console.log("Run the configuration wizard to set up Canvas Scraper:\n");
-    console.log("  node main.js --setup\n");
-    console.log("Or create a .env file manually (see .env.example)\n");
+    console.error("\n❌ No configuration found. Please run:");
+    console.error("  node main.js --setup\n");
     process.exit(1);
   }
 
@@ -65,7 +73,11 @@ const operationStats = {
     platform: process.platform,
   });
 
+  console.log("\n🎓 Canvas Scraper - Assignment Exporter\n");
+
   try {
+    console.log("🔍 Scraping assignments from Canvas...");
+
     let assignments = [];
     if (skipScraping) {
       sessionLogger.info(
@@ -89,6 +101,11 @@ const operationStats = {
       assignments = await scrapeCanvas(config, isDev, SESSION_ID);
     }
 
+    console.log(`\n📋 Found ${assignments.length} assignments in total.\n`);
+    console.log(
+      "➡️  Exporting assignments to selected platforms (if configured)...\n",
+    );
+
     // AIDEV-NOTE: Export operations using dedicated modules
     const { todoist, notion } = exportTo;
     if (todoist)
@@ -98,6 +115,8 @@ const operationStats = {
 
     if (!(todoist || notion))
       fs.writeFileSync("output.json", JSON.stringify(assignments, null, 2));
+
+    console.log("\n✅ All operations completed successfully.\n");
 
     // AIDEV-NOTE: Application completion logging
     logger.info("Canvas scraping application completed successfully", {

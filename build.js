@@ -1,9 +1,4 @@
 import esbuild from "esbuild";
-import { fileURLToPath } from "url";
-import { dirname, join } from "path";
-
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = dirname(__filename);
 
 // AIDEV-NOTE: esbuild configuration optimized for pkg packaging
 // Key considerations:

@@ -117,7 +117,7 @@ For enhanced security, you can encrypt your `.env` file using dotenvx:
 
 ```bash
 # Encrypt your .env file
-npx dotenvx encrypt
+npx @dotenvx/dotenvx encrypt
 
 # This creates:
 # - An encrypted .env file (safe to commit to git)
