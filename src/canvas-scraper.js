@@ -89,6 +89,14 @@ export const scrapeCanvas = async (config, isDev = false, sessionId) => {
     await performCanvasLogin(page, config, operationStats);
     await navigateToPlanner(page, config, operationStats);
 
+    // Scroll down to load all items
+    // scroll to the button with the text "Load more"
+    // await page.getByText("Load more").scrollIntoViewIfNeeded();
+    await page.getByText("Load more").click();
+    await page.waitForTimeout(2000); // wait 2 seconds
+    await page.getByText("Load more").click();
+    await page.waitForTimeout(2000); // wait 2 seconds
+
     // AIDEV-NOTE: Item discovery and data extraction
     const assignments = await scrapeCanvasItems(
       page,

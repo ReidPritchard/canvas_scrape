@@ -146,7 +146,6 @@ export async function exportToTodoist(
             /^Due:\s*/i,
             "",
           );
-          const cleaned_class_name = cleanName(class_name.toLowerCase());
           const data = {
             ...(item.title && { content: item.title }),
             ...(project_id && { projectId: project_id }),
@@ -154,7 +153,7 @@ export async function exportToTodoist(
             ...(cleanedDueDate && { dueString: cleanedDueDate }),
             ...(item.description && {
               description: `${item.description}\n\n[Canvas Link](${item.url})`,
-              labels: [cleaned_class_name, item.type],
+              labels: [item.class_name, item.type],
             }),
             priority: 3,
           };
@@ -288,6 +287,9 @@ export async function exportToTodoist(
           operation: "item_processing",
         });
       }
+
+      // AIDEV-NOTE: Throttle requests to respect Todoist API rate limits
+      await new Promise((resolve) => setTimeout(resolve, 300)); // 200ms delay between items
     }
 
     // AIDEV-NOTE: Todoist export completion summary with comprehensive statistics

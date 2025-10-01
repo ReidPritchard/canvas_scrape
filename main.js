@@ -106,15 +106,15 @@ const operationStats = {
       "➡️  Exporting assignments to selected platforms (if configured)...\n",
     );
 
+    // if (!(todoist || notion))
+    fs.writeFileSync("output.json", JSON.stringify(assignments, null, 2));
+
     // AIDEV-NOTE: Export operations using dedicated modules
     const { todoist, notion } = exportTo;
     if (todoist)
       await exportToTodoist(assignments, config, SESSION_ID, operationStats);
     if (notion)
       await exportToNotion(assignments, config, SESSION_ID, operationStats);
-
-    if (!(todoist || notion))
-      fs.writeFileSync("output.json", JSON.stringify(assignments, null, 2));
 
     console.log("\n✅ All operations completed successfully.\n");
 
