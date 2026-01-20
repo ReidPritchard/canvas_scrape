@@ -8,11 +8,11 @@ on:
   workflow_dispatch:
     inputs:
       version:
-        description: 'Release version (e.g., v1.0.0)'
+        description: "Release version (e.g., v1.0.0)"
         required: true
         type: string
       prerelease:
-        description: 'Mark as pre-release'
+        description: "Mark as pre-release"
         required: false
         type: boolean
         default: false
@@ -21,27 +21,27 @@ jobs:
   build-and-package:
     name: Build and Package Executables
     runs-on: ubuntu-latest
-    
+
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
-      
+
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: '22'
-      
+          node-version: "22"
+
       - name: Install pnpm
         uses: pnpm/action-setup@v4
         with:
-          version: '10.0.0'
-      
+          version: "10.0.0"
+
       - name: Install dependencies
         run: pnpm install
-      
+
       - name: Build with esbuild
         run: pnpm run build
-      
+
       - name: Package executables
         run: |
           # AIDEV-NOTE: Package for all platforms with Brotli compression
@@ -50,19 +50,19 @@ jobs:
             --targets node22-macos-x64,node22-linux-x64,node22-win-x64 \
             --output dist/canvas-scrape \
             --compress Brotli
-      
+
       - name: Verify executables
         run: |
           echo "Verifying created executables..."
           ls -lh dist/canvas-scrape-* || true
-          
+
           # Display file sizes
           echo ""
           echo "Executable sizes:"
           du -h dist/canvas-scrape-macos 2>/dev/null || echo "macOS executable not found"
           du -h dist/canvas-scrape-linux 2>/dev/null || echo "Linux executable not found"
           du -h dist/canvas-scrape-win.exe 2>/dev/null || echo "Windows executable not found"
-      
+
       - name: Generate checksums
         run: |
           cd dist
@@ -82,29 +82,29 @@ jobs:
             echo "canvas-scrape-win.exe: NOT FOUND" >> checksums.txt
           fi
           cat checksums.txt
-      
+
       - name: Prepare release artifacts
         run: |
           mkdir -p release-artifacts
-          
+
           # Copy executables
           cp dist/canvas-scrape-macos release-artifacts/
           cp dist/canvas-scrape-linux release-artifacts/
           cp dist/canvas-scrape-win.exe release-artifacts/
-          
+
           # Copy checksums
           cp dist/checksums.txt release-artifacts/
-          
+
           # Copy configuration template
           cp .env.example release-artifacts/
-          
+
           # Create README for release
           cat > release-artifacts/README.txt << 'EOFREADME'
           Canvas Scraper - Release Package
           =================================
-          
+
           This package contains pre-built executables for Canvas Scraper.
-          
+
           Files:
           ------
           - canvas-scrape-macos: macOS executable (x64)
@@ -112,31 +112,31 @@ jobs:
           - canvas-scrape-win.exe: Windows executable (x64)
           - checksums.txt: SHA256 checksums for verification
           - .env.example: Configuration template
-          
+
           Quick Start:
           ------------
           1. Download the executable for your platform
           2. Make it executable (macOS/Linux): chmod +x canvas-scrape-*
           3. Copy .env.example to .env and configure your credentials
           4. Run: ./canvas-scrape-macos (or appropriate executable)
-          
+
           Requirements:
           -------------
           - Playwright browsers must be installed separately
           - Configuration file (.env) must be in the same directory
           - See BUILD.md in the repository for full documentation
-          
+
           For more information, visit:
           https://github.com/ReidPritchard/canvas_scrape
           EOFREADME
-      
+
       - name: Upload artifacts
         uses: actions/upload-artifact@v4
         with:
           name: canvas-scrape-${{ github.event.inputs.version }}
           path: release-artifacts/
           retention-days: 90
-      
+
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
         with:
@@ -154,35 +154,35 @@ jobs:
             release-artifacts/README.txt
           body: |
             ## Canvas Scraper Release ${{ github.event.inputs.version }}
-            
+
             ### 📦 Packaged Executables
-            
+
             This release includes pre-built executables for:
             - **macOS** (x64) - Priority platform
             - **Linux** (x64)
             - **Windows** (x64)
-            
+
             ### 🚀 Quick Start
-            
+
             1. Download the executable for your platform
             2. Make it executable (macOS/Linux): `chmod +x canvas-scrape-*`
             3. Copy `.env.example` to `.env` and configure your credentials
             4. Run: `./canvas-scrape-macos` (or appropriate executable)
-            
+
             ### ⚠️ Requirements
-            
+
             - **Playwright browsers** must be installed separately on the target system
             - **Configuration file** (`.env`) must be present in the same directory
             - See [BUILD.md](https://github.com/ReidPritchard/canvas_scrape/blob/master/BUILD.md) for full documentation
-            
+
             ### 🔐 Security
-            
+
             - Verify downloads using the included `checksums.txt`
             - Never commit your `.env` file with real credentials
             - Use encrypted `.env` files for enhanced security (see README)
-            
+
             ### 📝 What's Changed
-            
+
             See below for automatically generated release notes.
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

@@ -2,6 +2,41 @@
 import { TodoistApi } from "@doist/todoist-api-typescript";
 import logger from "./logger.js";
 
+// AIDEV-NOTE: Rate limit delay between Todoist API requests (ms)
+const API_THROTTLE_DELAY_MS = 300;
+
+/**
+ * AIDEV-NOTE: Error Handling Policy
+ * - State retrieval errors (fetchTodoistState) are FATAL - cannot proceed without current tasks/projects
+ * - Individual assignment errors (processAssignment) are NON-FATAL - partial export is acceptable
+ * - API call errors (createNewTask, updateExistingTask) are NON-FATAL - logged and counted in stats
+ */
+
+/**
+ * @typedef {Object} CanvasAssignment
+ * @property {string} title - Assignment title
+ * @property {string} class_name - Course name (e.g., "ATLS 5420-001")
+ * @property {Object} [due_date] - Due date information
+ * @property {string} [due_date.string] - Due date string (may include "Due: " prefix)
+ * @property {string} [description] - Assignment description (optional for quizzes)
+ * @property {string} url - Canvas assignment URL
+ * @property {string} type - Assignment type ("assignment", "quiz", "discussion")
+ */
+
+/**
+ * @typedef {Object} TodoistConfig
+ * @property {string} [todoist_api_key] - Todoist API key from config file
+ */
+
+/**
+ * @typedef {Object} OperationStats
+ * @property {Object} apiStats - API operation statistics
+ * @property {Object} apiStats.todoist - Todoist-specific stats
+ * @property {number} apiStats.todoist.creates - Count of created tasks
+ * @property {number} apiStats.todoist.updates - Count of updated tasks
+ * @property {number} apiStats.todoist.errors - Count of API errors
+ */
+
 /**
  * Export assignments to Todoist with duplicate detection and error handling
  * @param {Array} assignments - Array of assignment objects from Canvas scraper
@@ -20,411 +55,644 @@ export async function exportToTodoist(
   if (!config.todoist_api_key && !process.env.TODOIST_API_KEY) {
     logger.info("Todoist export skipped - no API key configured", {
       context: "todoist_export",
-      sessionId: sessionId,
+      sessionId,
       operation: "export_skipped",
     });
     return;
   }
 
-  const todoistExportStart = Date.now();
+  const exportStartTime = Date.now();
   const todoistApi = new TodoistApi(
     process.env.TODOIST_API_KEY || config.todoist_api_key,
   );
 
   try {
-    // AIDEV-NOTE: Todoist sync initiation logging with session tracking
     logger.info("Starting Todoist export with performance tracking", {
       context: "todoist_export",
-      sessionId: sessionId,
+      sessionId,
       assignmentCount: assignments.length,
       operation: "export_start",
     });
 
-    // AIDEV-NOTE: Updated to use REST API methods instead of deprecated Sync API
-    let current_items, current_projects;
-    try {
-      // Get all tasks (both active and completed)
-      const tasksResponse = await todoistApi.getTasks();
-      current_items = tasksResponse.results || tasksResponse;
-
-      // Get all projects
-      const projectsResponse = await todoistApi.getProjects();
-      current_projects = projectsResponse.results || projectsResponse;
-
-      // AIDEV-NOTE: Todoist state management logging with item and project counts
-      logger.info("Todoist state retrieved", {
-        context: "todoist_export",
-        sessionId: sessionId,
-        totalItems: current_items.length,
-        totalProjects: current_projects.length,
-        operation: "state_management",
-      });
-    } catch (stateError) {
-      // AIDEV-NOTE: Todoist state retrieval error
-      logger.error("Failed to retrieve Todoist state", {
-        context: "todoist_export",
-        sessionId: sessionId,
-        error: stateError.message,
-        errorType: stateError.constructor.name,
-        operation: "state_retrieval",
-      });
-      throw stateError;
-    }
+    // AIDEV-NOTE: Fetch current Todoist state for duplicate detection
+    const { items: currentItems, projects: currentProjects } =
+      await fetchTodoistState(todoistApi, sessionId);
 
     for (const item of assignments) {
-      try {
-        // AIDEV-NOTE: Todoist item duplication check logging
-        logger.debug("Checking for existing Todoist item", {
-          context: "todoist_export",
-          sessionId: sessionId,
-          title: item.title,
-          totalItems: current_items.length,
-          operation: "duplication_check",
-        });
-
-        let previous_item;
-        try {
-          previous_item = await checkIfAlreadyAdded(current_items, item);
-
-          logger.debug("Todoist item check completed", {
-            context: "todoist_export",
-            sessionId: sessionId,
-            title: item.title,
-            existingItem: !!previous_item,
-            itemId: previous_item?.id,
-            isCompleted: !!previous_item?.isCompleted,
-            operation: "duplication_check_complete",
-          });
-        } catch (duplicateCheckError) {
-          // AIDEV-NOTE: Todoist duplicate check error with recovery
-          logger.warn(
-            "Failed to check for existing Todoist item, assuming new",
-            {
-              context: "todoist_export",
-              sessionId: sessionId,
-              error: duplicateCheckError.message,
-              title: item.title,
-              operation: "duplication_check",
-            },
-          );
-          previous_item = false; // Assume it's new if check fails
-        }
-
-        if (previous_item && previous_item.isCompleted) {
-          // If previous item has already been completed don't update it
-          // AIDEV-NOTE: Replaced console.log with structured logging for completed assignments
-          logger.info("Skipping completed assignment", {
-            context: "todoist_export",
-            sessionId: sessionId,
-            title: item.title,
-            reason: "Already completed",
-            isCompleted: previous_item.isCompleted,
-          });
-        } else {
-          let project_id;
-          try {
-            project_id = await findRelatedProject(
-              current_projects,
-              item.class_name,
-              sessionId,
-            );
-          } catch (projectError) {
-            // AIDEV-NOTE: Project lookup error with fallback
-            logger.warn("Failed to find related project, using default", {
-              context: "todoist_export",
-              sessionId: sessionId,
-              error: projectError.message,
-              title: item.title,
-              className: item.class_name,
-              operation: "project_lookup",
-            });
-            project_id = false; // Use default project
-          }
-
-          // AIDEV-NOTE: Clean date string by removing "Due: " prefix that Canvas adds to assignments
-          const cleanedDueDate = item.due_date?.string?.replace(
-            /^Due:\s*/i,
-            "",
-          );
-          const data = {
-            ...(item.title && { content: item.title }),
-            ...(project_id && { projectId: project_id }),
-            // Convert due date object to dueString for natural language processing
-            ...(cleanedDueDate && { dueString: cleanedDueDate }),
-            ...(item.description && {
-              description: `${item.description}\n\n[Canvas Link](${item.url})`,
-              labels: [item.class_name, item.type],
-            }),
-            priority: 3,
-          };
-
-          if (previous_item === false) {
-            // AIDEV-NOTE: Todoist add operation logging with item details
-            logger.info("Adding new item to Todoist", {
-              context: "todoist_export",
-              sessionId: sessionId,
-              title: item.title,
-              dueDate: item.due_date?.string,
-              projectId: project_id,
-              priority: data.priority,
-              action: "add",
-            });
-
-            try {
-              const startTime = Date.now();
-              const addResult = await todoistApi.addTask(data);
-              const endTime = Date.now();
-
-              operationStats.apiStats.todoist.creates++;
-
-              // AIDEV-NOTE: Todoist add operation completion logging with timing and session tracking
-              logger.info("Todoist item added successfully", {
-                context: "todoist_export",
-                sessionId: sessionId,
-                title: item.title,
-                itemId: addResult?.id,
-                duration: endTime - startTime,
-                action: "add_complete",
-                apiStats: operationStats.apiStats.todoist,
-              });
-            } catch (e) {
-              operationStats.apiStats.todoist.errors++;
-
-              // AIDEV-NOTE: Todoist API error logging for add operations with session tracking
-              logger.error("Todoist API error during item addition", {
-                context: "todoist_export",
-                sessionId: sessionId,
-                error: e.message,
-                errorType: e.constructor.name,
-                assignmentTitle: item.title,
-                projectId: project_id,
-                dueDate: item.due_date?.string,
-                stack: e.stack,
-                action: "add_error",
-                apiStats: operationStats.apiStats.todoist,
-              });
-            }
-          } else {
-            // AIDEV-NOTE: Build update data with Canvas link appended to description
-            const updateData = {
-              ...(item.description && {
-                description: `${item.description}\n\n[Canvas Link](${item.url})`,
-              }),
-            };
-
-            // AIDEV-NOTE: Skip update if there's nothing to update (e.g., quizzes without descriptions)
-            if (Object.keys(updateData).length === 0) {
-              logger.info("Skipping update - no changes needed", {
-                context: "todoist_export",
-                sessionId: sessionId,
-                title: item.title,
-                itemId: previous_item.id,
-                reason: "No description to add",
-                action: "update_skipped",
-              });
-            } else {
-              // AIDEV-NOTE: Todoist update operation logging with item details
-              logger.info("Updating existing Todoist item", {
-                context: "todoist_export",
-                sessionId: sessionId,
-                title: item.title,
-                dueDate: item.due_date?.string,
-                itemId: previous_item.id,
-                hasDescription: !!item.description,
-                action: "update",
-              });
-
-              try {
-                const startTime = Date.now();
-                // AIDEV-NOTE: Updated to use updateTask() instead of deprecated items.update()
-                const updateResult = await todoistApi.updateTask(
-                  previous_item.id,
-                  updateData,
-                );
-                const endTime = Date.now();
-
-                operationStats.apiStats.todoist.updates++;
-
-                // AIDEV-NOTE: Todoist update operation completion logging with timing and session tracking
-                logger.info("Todoist item updated successfully", {
-                  context: "todoist_export",
-                  sessionId: sessionId,
-                  title: item.title,
-                  itemId: updateResult.id,
-                  duration: endTime - startTime,
-                  action: "update_complete",
-                  apiStats: operationStats.apiStats.todoist,
-                });
-              } catch (e) {
-                operationStats.apiStats.todoist.errors++;
-
-                // AIDEV-NOTE: Todoist API error logging for update operations with session tracking
-                logger.error("Todoist API error during item update", {
-                  context: "todoist_export",
-                  sessionId: sessionId,
-                  error: e.message,
-                  errorType: e.constructor.name,
-                  assignmentTitle: item.title,
-                  itemId: previous_item.id,
-                  dueDate: item.due_date?.string,
-                  stack: e.stack,
-                  action: "update_error",
-                  apiStats: operationStats.apiStats.todoist,
-                });
-              }
-            }
-          }
-        }
-      } catch (itemError) {
-        // AIDEV-NOTE: Individual Todoist item processing error with recovery context
-        logger.error("Failed to process assignment for Todoist export", {
-          context: "todoist_export",
-          sessionId: sessionId,
-          error: itemError.message,
-          errorType: itemError.constructor.name,
-          assignmentTitle: item.title,
-          className: item.class_name,
-          operation: "item_processing",
-        });
-      }
+      await processAssignment(
+        item,
+        todoistApi,
+        currentItems,
+        currentProjects,
+        sessionId,
+        operationStats,
+      );
 
       // AIDEV-NOTE: Throttle requests to respect Todoist API rate limits
-      await new Promise((resolve) => setTimeout(resolve, 300)); // 200ms delay between items
+      await delay(API_THROTTLE_DELAY_MS);
     }
 
-    // AIDEV-NOTE: Todoist export completion summary with comprehensive statistics
-    const todoistExportDuration = Date.now() - todoistExportStart;
-    logger.info("Todoist export completed", {
-      context: "todoist_export",
-      sessionId: sessionId,
-      duration: todoistExportDuration,
-      assignmentCount: assignments.length,
-      apiStats: operationStats.apiStats.todoist,
-      successRate: Math.round(
-        ((operationStats.apiStats.todoist.creates +
-          operationStats.apiStats.todoist.updates) /
-          assignments.length) *
-          100,
-      ),
-      operation: "export_complete",
-    });
+    logExportCompletion(
+      exportStartTime,
+      assignments.length,
+      sessionId,
+      operationStats,
+    );
   } catch (error) {
-    // AIDEV-NOTE: Global Todoist export error handler with session context
     logger.error("Todoist export failed completely", {
       context: "todoist_export",
-      sessionId: sessionId,
+      sessionId,
       error: error.message,
       errorType: error.constructor.name,
       assignmentCount: assignments.length,
-      duration: Date.now() - todoistExportStart,
+      duration: Date.now() - exportStartTime,
       apiStats: operationStats.apiStats.todoist,
       operation: "export_failure",
     });
-    throw error; // Re-throw to allow caller to handle
+    throw error;
+  }
+}
+
+/**
+ * Fetch current Todoist tasks and projects for state management
+ * @param {TodoistApi} api - Todoist API instance
+ * @param {string} sessionId - Session ID for logging
+ * @returns {Promise<{items: Array, projects: Array}>}
+ */
+async function fetchTodoistState(api, sessionId) {
+  try {
+    // AIDEV-NOTE: REST API methods handle pagination internally
+    const tasksResponse = await api.getTasks();
+    const items = tasksResponse.results || tasksResponse;
+
+    const projectsResponse = await api.getProjects();
+    const projects = projectsResponse.results || projectsResponse;
+
+    logger.info("Todoist state retrieved", {
+      context: "todoist_export",
+      sessionId,
+      totalItems: items.length,
+      totalProjects: projects.length,
+      operation: "state_management",
+    });
+
+    return { items, projects };
+  } catch (error) {
+    logger.error("Failed to retrieve Todoist state", {
+      context: "todoist_export",
+      sessionId,
+      error: error.message,
+      errorType: error.constructor.name,
+      operation: "state_retrieval",
+    });
+    throw error;
+  }
+}
+
+/**
+ * Process a single assignment for Todoist export
+ * @param {Object} item - Assignment object from Canvas
+ * @param {TodoistApi} api - Todoist API instance
+ * @param {Array} currentItems - Existing Todoist tasks
+ * @param {Array} currentProjects - Existing Todoist projects
+ * @param {string} sessionId - Session ID for logging
+ * @param {Object} operationStats - Statistics tracker
+ */
+async function processAssignment(
+  item,
+  api,
+  currentItems,
+  currentProjects,
+  sessionId,
+  operationStats,
+) {
+  try {
+    const existingItem = findExistingItem(currentItems, item, sessionId);
+
+    if (existingItem?.isCompleted) {
+      logger.info("Skipping completed assignment", {
+        context: "todoist_export",
+        sessionId,
+        title: item.title,
+        reason: "Already completed",
+        isCompleted: existingItem.isCompleted,
+      });
+      return;
+    }
+
+    // AIDEV-NOTE: Enhanced project/section matching logic
+    const projectId = findProjectId(
+      currentProjects,
+      item.class_name,
+      sessionId,
+    );
+    const sectionId = await findOrCreateSectionId(
+      api,
+      projectId,
+      item.class_name,
+      sessionId,
+    );
+
+    const taskData = buildTaskData(item, projectId, sectionId);
+
+    if (existingItem) {
+      await updateExistingTask(
+        api,
+        taskData,
+        existingItem,
+        item,
+        sessionId,
+        operationStats,
+      );
+    } else {
+      await createNewTask(
+        api,
+        taskData,
+        item,
+        projectId,
+        sessionId,
+        operationStats,
+      );
+    }
+  } catch (error) {
+    logger.error("Failed to process assignment for Todoist export", {
+      context: "todoist_export",
+      sessionId,
+      error: error.message,
+      errorType: error.constructor.name,
+      assignmentTitle: item.title,
+      className: item.class_name,
+      operation: "item_processing",
+    });
   }
 }
 
 /**
  * Check if an assignment already exists in Todoist
+ * AIDEV-NOTE: Prioritizes URL matching (more reliable) over title matching (fallback)
  * @param {Array} items - Array of existing Todoist items
- * @param {Object} given_item - Assignment item to check
- * @returns {Promise<Object|boolean>} - Returns existing item or false if not found
+ * @param {CanvasAssignment} givenItem - Assignment item to check
+ * @param {string} sessionId - Session ID for logging
+ * @returns {Object|null} - Returns existing item or null if not found
  */
-async function checkIfAlreadyAdded(items, given_item) {
-  try {
-    // AIDEV-NOTE: Duplicate detection by Canvas URL in task description or content
-    const possible_item = items.find((item) => {
-      // Check both content title match and Canvas URL in description
-      const titleMatch = item.content === given_item.title;
-      const urlMatch =
-        given_item.url &&
-        item.description &&
-        item.description.includes(given_item.url);
-      return titleMatch || urlMatch;
-    });
+function findExistingItem(items, givenItem, sessionId) {
+  logger.debug("Checking for existing Todoist item", {
+    context: "todoist_export",
+    sessionId,
+    title: givenItem.title,
+    hasUrl: !!givenItem.url,
+    totalItems: items.length,
+    operation: "duplication_check",
+  });
 
-    return possible_item ? possible_item : false;
-  } catch (error) {
-    // AIDEV-NOTE: Todoist item comparison error with array safety
-    logger.error("Todoist item comparison failed", {
-      context: "utility",
-      error: error.message,
-      errorType: error.constructor.name,
-      itemsCount: items?.length || 0,
-      givenItemTitle: given_item?.title || "Unknown",
-      operation: "todoist_item_comparison",
+  try {
+    // AIDEV-NOTE: Prioritize URL match - Canvas URLs are stable even if titles change
+    if (givenItem.url) {
+      const urlMatch = items.find((item) =>
+        item.description?.includes(givenItem.url),
+      );
+
+      if (urlMatch) {
+        logger.debug("Todoist item found by URL match", {
+          context: "todoist_export",
+          sessionId,
+          title: givenItem.title,
+          itemId: urlMatch.id,
+          matchType: "url",
+          isCompleted: !!urlMatch.isCompleted,
+          operation: "duplication_check_complete",
+        });
+        return urlMatch;
+      }
+    }
+
+    // AIDEV-NOTE: Fallback to title match for legacy items without URL tracking
+    const titleMatch = items.find((item) => item.content === givenItem.title);
+
+    if (titleMatch) {
+      logger.debug("Todoist item found by title match", {
+        context: "todoist_export",
+        sessionId,
+        title: givenItem.title,
+        itemId: titleMatch.id,
+        matchType: "title",
+        isCompleted: !!titleMatch.isCompleted,
+        operation: "duplication_check_complete",
+      });
+      return titleMatch;
+    }
+
+    logger.debug("No existing Todoist item found", {
+      context: "todoist_export",
+      sessionId,
+      title: givenItem.title,
+      operation: "duplication_check_complete",
     });
-    return false; // Return false if comparison fails
+    return null;
+  } catch (error) {
+    logger.warn("Failed to check for existing Todoist item, assuming new", {
+      context: "todoist_export",
+      sessionId,
+      error: error.message,
+      title: givenItem.title,
+      operation: "duplication_check",
+    });
+    return null;
   }
 }
 
 /**
  * Find a related Todoist project for a class name
+ * AIDEV-NOTE: Implements fallback search for generic project names
  * @param {Array} projects - Array of Todoist projects
- * @param {string} class_name - Class name to find project for
+ * @param {string} className - Class name to find project for
  * @param {string} sessionId - Session ID for logging
- * @returns {Promise<string|boolean>} - Project ID or false if not found
+ * @returns {string|null} - Project ID or null if not found
  */
-async function findRelatedProject(projects, class_name, sessionId) {
+function findProjectId(projects, className, sessionId) {
   try {
-    const cleaned_class_name = cleanName(class_name.toLowerCase());
+    const cleanedName = cleanClassName(className);
+    const genericNames = [
+      "school",
+      "classes",
+      "courses",
+      "university",
+      "college",
+      "education",
+      "studies",
+      "academics",
+      "learning",
+      "students",
+      "schoolwork",
+      "assignments",
+      "homework",
+      "undergrad",
+      "grad",
+      "graduate",
+      "postgrad",
+      "postgraduate",
+      "masters",
+      "phd",
+      "doctoral",
+    ]; // Fallback project names
 
-    // AIDEV-NOTE: Project lookup logging with class name matching
     logger.debug("Looking up related project", {
       context: "todoist_export",
-      sessionId: sessionId,
-      originalClassName: class_name,
-      cleanedClassName: cleaned_class_name,
-      availableProjects: projects.length,
+      sessionId,
+      originalClassName: className,
+      cleanedClassName: cleanedName,
+      availableProjects: projects.map((p) => p.name).join(", "),
       operation: "project_lookup",
     });
 
-    const possible_project = projects.find((project) => {
-      return project.name.toLowerCase().includes(cleaned_class_name);
-    });
+    // 1. Direct match (most specific)
+    let matchedProject = projects.find((project) =>
+      project.name.toLowerCase().includes(cleanedName),
+    );
 
-    // AIDEV-NOTE: Project lookup results logging with match details
+    // 2. Fallback to generic project names if no direct match found
+    if (!matchedProject) {
+      matchedProject = projects.find((project) =>
+        // Match if any generic name is included in the project name
+        genericNames.some((generic) =>
+          project.name.toLowerCase().includes(generic),
+        ),
+      );
+    }
+
     logger.debug("Project lookup completed", {
       context: "todoist_export",
-      sessionId: sessionId,
-      className: class_name,
-      matchFound: !!possible_project,
-      projectId: possible_project?.id,
-      projectName: possible_project?.name,
+      sessionId,
+      className,
+      matchFound: !!matchedProject,
+      projectId: matchedProject?.id,
+      projectName: matchedProject?.name,
       operation: "project_lookup_complete",
     });
 
-    return possible_project ? possible_project.id : false;
+    return matchedProject?.id || null;
   } catch (error) {
-    // AIDEV-NOTE: Project lookup error with fallback behavior
-    logger.error("Project lookup failed", {
+    logger.warn("Failed to find related project, using default", {
       context: "todoist_export",
-      sessionId: sessionId,
+      sessionId,
       error: error.message,
-      errorType: error.constructor.name,
-      className: class_name,
-      projectsCount: projects?.length || 0,
+      className,
       operation: "project_lookup",
     });
-    return false; // Return false (default project) if lookup fails
+    return null;
   }
 }
 
 /**
- * Clean a string for project matching
- * @param {string} string - String to clean
- * @returns {string} - Cleaned string
- *
- * @example
- * "ATLS 5420-001" -> "atls 5420"
+ * Find or create a section within a project for the given class name.
+ * @param {TodoistApi} api - The Todoist API instance.
+ * @param {string} projectId - The ID of the project to search within.
+ * @param {string} className - The name of the class to find or create a section for.
+ * @param {string} sessionId - The session ID for logging.
+ * @returns {Promise<string|null>} The section ID or null if not applicable.
  */
-function cleanName(string) {
-  let cleaned = string
+async function findOrCreateSectionId(api, projectId, className, sessionId) {
+  if (!projectId) {
+    return null; // Cannot create a section without a project
+  }
+
+  try {
+    const sections = await api.getSections(projectId);
+    const sectionName = cleanClassName(className);
+
+    // Match any section that includes the cleaned class name
+    let section = sections.results.find((sec) =>
+      sec.name.toLowerCase().includes(sectionName),
+    );
+
+    if (!section) {
+      logger.info(`No section found for "${sectionName}". Creating it.`, {
+        context: "todoist_export",
+        sessionId,
+        projectId,
+      });
+      section = await api.addSection({
+        name: sectionName,
+        projectId: projectId,
+      });
+    }
+
+    return section.id;
+  } catch (error) {
+    logger.error("Failed to find or create a Todoist section.", {
+      context: "todoist_export",
+      sessionId,
+      error: error.message,
+      projectId,
+      className,
+    });
+    return null;
+  }
+}
+
+/**
+ * Build task data object for Todoist API
+ * @param {Object} item - Canvas assignment
+ * @param {string|null} projectId - Todoist project ID
+ * @param {string|null} sectionId - Todoist section ID
+ * @returns {Object} - Task data for API
+ */
+function buildTaskData(item, projectId, sectionId) {
+  // AIDEV-NOTE: Clean date string by removing "Due: " prefix that Canvas adds
+  const cleanedDueDate = item.due_date?.string?.replace(/^Due:\s*/i, "");
+
+  return {
+    ...(item.title && { content: item.title }),
+    ...(projectId && { projectId }),
+    ...(sectionId && { sectionId }),
+    ...(cleanedDueDate && { dueString: cleanedDueDate }),
+    ...(item.description && {
+      description: `${item.description}\n\n[Canvas Link](${item.url})`,
+      labels: [item.class_name, item.type],
+    }),
+    priority: 3,
+  };
+}
+
+/**
+ * Create a new task in Todoist
+ */
+async function createNewTask(
+  api,
+  taskData,
+  item,
+  projectId,
+  sessionId,
+  operationStats,
+) {
+  logger.info("Adding new item to Todoist", {
+    context: "todoist_export",
+    sessionId,
+    title: item.title,
+    dueDate: item.due_date?.string,
+    projectId,
+    priority: taskData.priority,
+    action: "add",
+  });
+
+  try {
+    const startTime = Date.now();
+    const result = await api.addTask(taskData);
+    const duration = Date.now() - startTime;
+
+    operationStats.apiStats.todoist.creates++;
+
+    logger.info("Todoist item added successfully", {
+      context: "todoist_export",
+      sessionId,
+      title: item.title,
+      itemId: result?.id,
+      duration,
+      action: "add_complete",
+      apiStats: operationStats.apiStats.todoist,
+    });
+  } catch (error) {
+    operationStats.apiStats.todoist.errors++;
+
+    logger.error("Todoist API error during item addition", {
+      context: "todoist_export",
+      sessionId,
+      error: error.message,
+      errorType: error.constructor.name,
+      assignmentTitle: item.title,
+      projectId,
+      dueDate: item.due_date?.string,
+      stack: error.stack,
+      action: "add_error",
+      apiStats: operationStats.apiStats.todoist,
+    });
+  }
+}
+
+/**
+ * Update an existing task in Todoist
+ * @param {TodoistApi} api - Todoist API instance
+ * @param {Object} taskData - New task data to update
+ * @param {Object} existingItem - Existing Todoist item to update
+ * @param {Object} item - Original Canvas assignment item
+ * @param {string} sessionId - Session ID for logging
+ * @param {Object} operationStats - Statistics tracker
+ * @returns {Promise<void>}
+ */
+async function updateExistingTask(
+  api,
+  taskData,
+  existingItem,
+  item,
+  sessionId,
+  operationStats,
+) {
+  const updateData = {};
+
+  // If description is missing in existing item but present in new item, add it
+  if (item.description && !existingItem.description) {
+    updateData.description = `${item.description}\n\n[Canvas Link](${item.url})`;
+  }
+
+  // If due date has changed, update it
+  const cleanedDueDate = item.due_date?.string?.replace(/^Due:\s*/i, "");
+  if (cleanedDueDate && existingItem.due?.string !== cleanedDueDate) {
+    updateData.dueString = cleanedDueDate;
+  }
+
+  // Check if the task location needs to be updated (projectId or sectionId)
+  const needsMove =
+    (taskData.projectId && taskData.projectId !== existingItem.projectId) ||
+    (taskData.sectionId && taskData.sectionId !== existingItem.sectionId);
+
+  // If no updates are needed, skip the update
+  if (Object.keys(updateData).length === 0 && !needsMove) {
+    logger.info("Skipping update - no changes needed", {
+      context: "todoist_export",
+      sessionId,
+      title: item.title,
+      itemId: existingItem.id,
+      reason: "No description to add",
+      action: "update_skipped",
+    });
+    return;
+  }
+
+  logger.info("Updating existing Todoist item", {
+    context: "todoist_export",
+    sessionId,
+    title: item.title,
+    dueDate: item.due_date?.string,
+    itemId: existingItem.id,
+    hasDescription: !!item.description,
+    action: "update",
+  });
+
+  // FIXME: refactor this so it's cleaner
+
+  // Move the existing task if projectId or sectionId changed
+  if (
+    (taskData.projectId && taskData.projectId !== existingItem.projectId) ||
+    (taskData.sectionId && taskData.sectionId !== existingItem.sectionId)
+  ) {
+    try {
+      const startTime = Date.now();
+      await api.moveTask(existingItem.id, {
+        projectId: taskData.projectId,
+        sectionId: taskData.sectionId,
+      });
+      const duration = Date.now() - startTime;
+
+      logger.info("Todoist item moved successfully", {
+        context: "todoist_export",
+        sessionId,
+        title: item.title,
+        itemId: existingItem.id,
+        duration,
+        action: "move_complete",
+      });
+    } catch (error) {
+      operationStats.apiStats.todoist.errors++;
+
+      logger.error("Todoist API error during item move", {
+        context: "todoist_export",
+        sessionId,
+        error: error.message,
+        errorType: error.constructor.name,
+        assignmentTitle: item.title,
+        itemId: existingItem.id,
+        dueDate: item.due_date?.string,
+        stack: error.stack,
+        action: "move_error",
+        apiStats: operationStats.apiStats.todoist,
+      });
+    }
+  }
+
+  // Update any task fields as needed
+  try {
+    const startTime = Date.now();
+    const result = await api.updateTask(existingItem.id, updateData);
+    const duration = Date.now() - startTime;
+
+    operationStats.apiStats.todoist.updates++;
+
+    logger.info("Todoist item updated successfully", {
+      context: "todoist_export",
+      sessionId,
+      title: item.title,
+      itemId: result.id,
+      duration,
+      action: "update_complete",
+      apiStats: operationStats.apiStats.todoist,
+    });
+  } catch (error) {
+    operationStats.apiStats.todoist.errors++;
+
+    logger.error("Todoist API error during item update", {
+      context: "todoist_export",
+      sessionId,
+      error: error.message,
+      errorType: error.constructor.name,
+      assignmentTitle: item.title,
+      itemId: existingItem.id,
+      dueDate: item.due_date?.string,
+      stack: error.stack,
+      action: "update_error",
+      apiStats: operationStats.apiStats.todoist,
+    });
+  }
+}
+
+/**
+ * Log export completion with statistics
+ */
+function logExportCompletion(
+  startTime,
+  assignmentCount,
+  sessionId,
+  operationStats,
+) {
+  const duration = Date.now() - startTime;
+  const { creates, updates } = operationStats.apiStats.todoist;
+  const successRate =
+    assignmentCount > 0
+      ? Math.round(((creates + updates) / assignmentCount) * 100)
+      : 0;
+
+  logger.info("Todoist export completed", {
+    context: "todoist_export",
+    sessionId,
+    duration,
+    assignmentCount,
+    apiStats: operationStats.apiStats.todoist,
+    successRate,
+    operation: "export_complete",
+  });
+}
+
+/**
+ * Clean a class name for project matching
+ * @param {string} className - Class name to clean
+ * @returns {string} - Cleaned string for matching
+ * @example "ATLS 5420-001" -> "atls"
+ */
+function cleanClassName(className) {
+  // AIDEV-NOTE: Remove special chars, section identifiers, and trailing numbers
+  return className
     .toLowerCase()
-    .replace(/[^a-z0-9\s]/g, "") // Remove special characters
-    .replace(/\s+/g, " ") // Replace multiple spaces with single space
-    .trim() // Trim leading/trailing spaces
-    .replace(/\s(-|section)\s.*$/, "") // Remove section identifiers like " - 001" or " section 001"
-    .replace(/\s\d{3,}$/, ""); // Remove trailing numbers (e.g. " 5420")
-  return cleaned;
+    .replace(/[^a-z0-9\s]/g, "")
+    .replace(/\s+/g, " ")
+    .trim()
+    .replace(/\s(-|section)\s.*$/, "")
+    .replace(/\s\d{3,}$/, "");
+}
+
+/**
+ * Promise-based delay helper
+ * @param {number} ms - Milliseconds to delay
+ * @returns {Promise<void>}
+ */
+function delay(ms) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
 }

@@ -127,6 +127,7 @@ canvas-scrape-v1.0.0/
 After downloading:
 
 ### macOS / Linux
+
 ```bash
 # 1. Download executable for your platform
 curl -LO https://github.com/ReidPritchard/canvas_scrape/releases/latest/download/canvas-scrape-macos
@@ -146,6 +147,7 @@ nano .env
 ```
 
 ### Windows
+
 ```powershell
 # 1. Download executable
 Invoke-WebRequest -Uri "https://github.com/ReidPritchard/canvas_scrape/releases/latest/download/canvas-scrape-win.exe" -OutFile "canvas-scrape.exe"
@@ -176,25 +178,29 @@ sha256sum -c checksums.txt
 
 ## Version Numbering Guide
 
-| Version Type | Example | When to Use |
-|-------------|---------|-------------|
-| **Major** | v2.0.0 | Breaking changes, API changes |
-| **Minor** | v1.1.0 | New features, non-breaking |
-| **Patch** | v1.0.1 | Bug fixes, small improvements |
-| **Pre-release** | v1.0.0-beta.1 | Testing new features |
+| Version Type    | Example       | When to Use                   |
+| --------------- | ------------- | ----------------------------- |
+| **Major**       | v2.0.0        | Breaking changes, API changes |
+| **Minor**       | v1.1.0        | New features, non-breaking    |
+| **Patch**       | v1.0.1        | Bug fixes, small improvements |
+| **Pre-release** | v1.0.0-beta.1 | Testing new features          |
 
 ## Common Issues
 
 ### ❌ "Workflow not found"
+
 **Solution**: Make sure you're on the correct branch with the workflow file
 
 ### ❌ "Permission denied"
+
 **Solution**: Need repository write permissions to trigger workflows
 
 ### ❌ "Release already exists"
+
 **Solution**: Delete existing release/tag or use a different version number
 
 ### ❌ "Packaging step fails"
+
 **Solution**: Check workflow logs - usually a dependency or build issue
 
 ## Need Help?

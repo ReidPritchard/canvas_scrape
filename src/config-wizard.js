@@ -33,10 +33,10 @@ export async function runConfigWizard(configPath = null, format = null) {
   if (!process.stdin.isTTY) {
     throw new Error(
       "Interactive wizard requires a terminal (TTY).\n" +
-      "To use in non-interactive environments:\n" +
-      "  1. Create config file manually (see .env.example)\n" +
-      "  2. Use environment variables\n" +
-      "  3. Provide pre-configured config file via --config flag"
+        "To use in non-interactive environments:\n" +
+        "  1. Create config file manually (see .env.example)\n" +
+        "  2. Use environment variables\n" +
+        "  3. Provide pre-configured config file via --config flag",
     );
   }
 
@@ -63,7 +63,9 @@ export async function runConfigWizard(configPath = null, format = null) {
     if (!configPath) {
       console.log("\nConfiguration Location:");
       console.log("  1) Current directory (.env or config.json)");
-      console.log("  2) Home directory (~/.canvas-scraper.env or ~/.canvas-scraper.json)");
+      console.log(
+        "  2) Home directory (~/.canvas-scraper.env or ~/.canvas-scraper.json)",
+      );
       console.log("  3) Custom path\n");
 
       const locationChoice = await input({
@@ -78,9 +80,10 @@ export async function runConfigWizard(configPath = null, format = null) {
         });
       } else if (locationChoice === "2") {
         const home = process.env.HOME || process.env.USERPROFILE;
-        configPath = format === "json"
-          ? path.join(home, ".canvas-scraper.json")
-          : path.join(home, ".canvas-scraper.env");
+        configPath =
+          format === "json"
+            ? path.join(home, ".canvas-scraper.json")
+            : path.join(home, ".canvas-scraper.env");
       } else {
         configPath = format === "json" ? "./config.json" : "./.env";
       }
@@ -130,7 +133,9 @@ export async function runConfigWizard(configPath = null, format = null) {
 
     let todoistApiKey = "";
     if (enableTodoist) {
-      console.log("Get your API key from: https://todoist.com/prefs/integrations");
+      console.log(
+        "Get your API key from: https://todoist.com/prefs/integrations",
+      );
       todoistApiKey = await input({
         message: "Todoist API Key",
       });
@@ -149,7 +154,9 @@ export async function runConfigWizard(configPath = null, format = null) {
     let notionApiKey = "";
     let notionDatabaseId = "";
     if (enableNotion) {
-      console.log("Get your API key from: https://www.notion.so/my-integrations");
+      console.log(
+        "Get your API key from: https://www.notion.so/my-integrations",
+      );
       notionApiKey = await input({
         message: "Notion API Key",
       });
@@ -173,7 +180,9 @@ export async function runConfigWizard(configPath = null, format = null) {
     // Add explicit warning if user declines encryption with password present
     if (!enableEncryption && canvasPassword) {
       console.log("\n⚠️  WARNING: Your password will be stored in PLAIN TEXT!");
-      console.log("   Anyone with access to the config file can read your password.");
+      console.log(
+        "   Anyone with access to the config file can read your password.",
+      );
       const confirmPlain = await confirm({
         message: "Are you sure you want to continue without encryption?",
         default: false,
@@ -224,12 +233,16 @@ export async function runConfigWizard(configPath = null, format = null) {
             stdio: "inherit",
           });
           console.log("✅ Configuration encrypted successfully");
-          console.log(`⚠️  Keep ${configPath}.keys secure and NEVER commit it!`);
+          console.log(
+            `⚠️  Keep ${configPath}.keys secure and NEVER commit it!`,
+          );
         } catch (error) {
           console.log(
-            "⚠️  Encryption failed. Configuration saved unencrypted."
+            "⚠️  Encryption failed. Configuration saved unencrypted.",
           );
-          console.log("   You can encrypt it later with: npx @dotenvx/dotenvx encrypt");
+          console.log(
+            "   You can encrypt it later with: npx @dotenvx/dotenvx encrypt",
+          );
         }
       }
     } else {
@@ -248,12 +261,16 @@ export async function runConfigWizard(configPath = null, format = null) {
             stdio: "inherit",
           });
           console.log("✅ Configuration encrypted successfully");
-          console.log(`⚠️  Keep ${configPath}.keys secure and NEVER commit it!`);
+          console.log(
+            `⚠️  Keep ${configPath}.keys secure and NEVER commit it!`,
+          );
         } catch (error) {
           console.log(
-            "⚠️  Encryption failed. Configuration saved unencrypted."
+            "⚠️  Encryption failed. Configuration saved unencrypted.",
           );
-          console.log("   You can encrypt it later with: npx @dotenvx/dotenvx encrypt");
+          console.log(
+            "   You can encrypt it later with: npx @dotenvx/dotenvx encrypt",
+          );
         }
       }
     }
@@ -275,7 +292,10 @@ export async function runConfigWizard(configPath = null, format = null) {
   } catch (error) {
     // AIDEV-NOTE: Distinguish between user cancellation (Ctrl+C) and actual errors
     // @inquirer/prompts throws ExitPromptError or 'User force closed' on cancellation
-    if (error.name === 'ExitPromptError' || error.message.includes('User force closed')) {
+    if (
+      error.name === "ExitPromptError" ||
+      error.message.includes("User force closed")
+    ) {
       console.log("\n\n⚠️  Configuration wizard cancelled by user.");
       process.exit(0);
     }
@@ -293,7 +313,7 @@ export async function runConfigWizard(configPath = null, format = null) {
  */
 export function checkConfigExists(customPath = null) {
   const home = process.env.HOME || process.env.USERPROFILE;
-  
+
   const possiblePaths = customPath
     ? [customPath]
     : [
@@ -325,23 +345,27 @@ export function loadJsonConfig(configPath) {
   // AIDEV-NOTE: JSON config loader with support for encrypted files
   try {
     const content = fs.readFileSync(configPath, "utf-8");
-    
+
     // Check if file appears to be encrypted (dotenvx format)
     if (content.includes("#/---")) {
       // Try to decrypt using dotenvx - this is synchronous via process.env
       const keysPath = `${configPath}.keys`;
       if (fs.existsSync(keysPath)) {
         throw new Error(
-          `Encrypted JSON config detected. Please use .env format for encryption or decrypt manually.`
+          `Encrypted JSON config detected. Please use .env format for encryption or decrypt manually.`,
         );
       } else {
-        throw new Error(`Encrypted config found but keys file missing: ${keysPath}`);
+        throw new Error(
+          `Encrypted config found but keys file missing: ${keysPath}`,
+        );
       }
     }
-    
+
     // Plain JSON file
     return JSON.parse(content);
   } catch (error) {
-    throw new Error(`Failed to load JSON config from ${configPath}: ${error.message}`);
+    throw new Error(
+      `Failed to load JSON config from ${configPath}: ${error.message}`,
+    );
   }
 }

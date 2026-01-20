@@ -10,9 +10,17 @@ const consoleFormat = printf(
   ({ level, message, timestamp, context, ...meta }) => {
     let contextStr = context ? `[${context}] ` : "";
 
-    const metaStr = Object.keys(meta).length
-      ? JSON.stringify(meta, null, 2)
-      : "";
+    let metaStr = "";
+    if (Object.keys(meta).length) {
+      metaStr = Object.entries(meta)
+        .map(([key, value]) => {
+          if (typeof value === "object") {
+            return `\t${key}: ${JSON.stringify(value, null, 2)}`;
+          }
+          return `\t${key}: ${value}`;
+        })
+        .join("\n");
+    }
 
     return `${timestamp} ${level}: ${contextStr}${message}\n${metaStr}`;
   },

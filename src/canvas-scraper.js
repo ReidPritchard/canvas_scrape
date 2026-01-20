@@ -378,6 +378,7 @@ const navigateToPlanner = async (page, config, operationStats) => {
 /**
  * Discovers and scrapes all Canvas items (assignments, quizzes, discussions)
  * @private
+ * @param {import("playwright").Page} page - Playwright page instance
  */
 const scrapeCanvasItems = async (page, context, config, operationStats) => {
   const { url } = config;
@@ -391,9 +392,100 @@ const scrapeCanvasItems = async (page, context, config, operationStats) => {
       timestamp: Date.now(),
     };
 
-    // Next find every planner day that contains elements
-    item_links = await page.$$(SELECTORS.planner.items);
+    // Get each "day" element
+    // each day element contains items grouped by class
+    const day_elements = page.getByTestId("day");
+    const day_count = await day_elements.count();
 
+    // Collect all item links and related class names
+    item_links = [];
+    //
+    // Get each class group inside each day
+    // .locator("div.Grouping-styles__root")
+    //
+    // Get class name from each group inside day element
+    // .locator("span.Grouping-styles__title")
+    //
+    // Get each item inside each class group
+    // .getByTestId("planner-item-raw")
+
+    for (let d = 0; d < day_count; d++) {
+      const day = day_elements.nth(d);
+      const class_groups = day.locator("div.Grouping-styles__root");
+      const class_group_count = await class_groups.count();
+
+      for (let g = 0; g < class_group_count; g++) {
+        const group = class_groups.nth(g);
+        const class_name_element = group.locator("span.Grouping-styles__title");
+        let class_name = "Unknown Class";
+        try {
+          class_name = await class_name_element.innerText();
+        } catch (classError) {
+          // AIDEV-NOTE: Class name extraction error with fallback logging
+          logger.warn("Failed to extract class name from group", {
+            context: "scraping",
+            sessionId: operationStats.sessionId,
+            error: classError.message,
+            dayIndex: d + 1,
+            groupIndex: g + 1,
+            selector: "span.Grouping-styles__title",
+            operation: "class_name_extraction",
+          });
+        }
+
+        const item_elements = group.getByTestId("planner-item-raw");
+        const item_count = await item_elements.count();
+
+        for (let i = 0; i < item_count; i++) {
+          const item = item_elements.nth(i);
+          const link = item.getByRole("link");
+          item_links.push({
+            link: link,
+            class_name: class_name,
+          });
+        }
+      }
+    }
+
+    // DEBUG: Log all items and then exit the process
+    // console.log(`\n📝 Discovered ${item_links.length} planner items:\n`);
+
+    const hrefPromises = item_links.map((item) =>
+      item.link.getAttribute("href").catch(() => "Unknown URL"),
+    );
+    const textPromises = item_links.map((item) =>
+      item.link.innerText().catch(() => "Unknown Title"),
+    );
+
+    const [hrefs, texts] = await Promise.all([
+      Promise.all(hrefPromises),
+      Promise.all(textPromises),
+    ]);
+    // TODO: Since we are doing this, we can just use these arrays directly
+    // instead of item_links during processing. Or we can augment item_links
+    // with title and href properties here.
+
+    // item_links.forEach((item, i) => {
+    //   // console.log(`Item ${i + 1}: ${JSON.stringify(item)}`);
+    //   console.log(
+    //     `- [${i + 1}] ${texts[i]} (${item.class_name}) -> ${hrefs[i]}`,
+    //   );
+    // });
+
+    // console.log("\n");
+    // process.exit(0);
+    //
+    // A number of items found are coming back as:
+    // - [38] Unknown Title (NEURODESIGN) -> Unknown URL
+    // I think these are "events" items in the planner
+    // We should skip these during processing
+
+    // AIDEV-NOTE: Filter out items with missing title or URL
+    item_links = item_links.filter((item, i) => {
+      return hrefs[i] !== "Unknown URL" && texts[i] !== "Unknown Title";
+    });
+
+    // Update total items in operation stats
     operationStats.scrapingStats.totalItems = item_links.length;
 
     // AIDEV-NOTE: Item discovery logging with count and selector info
@@ -451,7 +543,7 @@ const scrapeCanvasItems = async (page, context, config, operationStats) => {
 
       // Get item title for logging
       try {
-        itemTitle = (await item_links[i].innerText()).replace("\n", " ");
+        itemTitle = (await item_links[i].link.innerText()).replace("\n", " ");
       } catch (titleError) {
         // AIDEV-NOTE: Item title extraction error with fallback logging and session tracking
         logger.warn("Failed to extract item title", {
@@ -480,7 +572,7 @@ const scrapeCanvasItems = async (page, context, config, operationStats) => {
       // Open assignment/item page
       let itemUrl;
       try {
-        const href = await item_links[i].getAttribute("href");
+        const href = await item_links[i].link.getAttribute("href");
         itemUrl = url + href;
         await assignment_page.goto(itemUrl);
       } catch (navigationError) {
@@ -516,28 +608,30 @@ const scrapeCanvasItems = async (page, context, config, operationStats) => {
       }
 
       // Find class_name
-      let class_name = "Unknown Class";
-      try {
-        const classElement = await assignment_page.$(
-          SELECTORS.breadcrumbs.className,
-        );
+      let class_name = item_links[i].class_name || "Unknown Class";
+      if (class_name === "Unknown Class") {
+        try {
+          const classElement = await assignment_page.$(
+            SELECTORS.breadcrumbs.className,
+          );
 
-        if (classElement) {
-          class_name = await classElement.innerText();
-        } else {
-          throw new Error("Class name element not found");
+          if (classElement) {
+            class_name = await classElement.innerText();
+          } else {
+            throw new Error("Class name element not found");
+          }
+        } catch (classError) {
+          // AIDEV-NOTE: Class name extraction error with fallback behavior
+          logger.warn("Failed to extract class name, using fallback", {
+            context: "scraping",
+            error: classError.message,
+            itemIndex: i + 1,
+            itemTitle: itemTitle,
+            fallbackClassName: class_name,
+            selector: SELECTORS.breadcrumbs.className,
+            operation: "class_name_extraction",
+          });
         }
-      } catch (classError) {
-        // AIDEV-NOTE: Class name extraction error with fallback behavior
-        logger.warn("Failed to extract class name, using fallback", {
-          context: "scraping",
-          error: classError.message,
-          itemIndex: i + 1,
-          itemTitle: itemTitle,
-          fallbackClassName: class_name,
-          selector: SELECTORS.breadcrumbs.className,
-          operation: "class_name_extraction",
-        });
       }
 
       // find content once page loads

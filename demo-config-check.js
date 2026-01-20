@@ -13,14 +13,16 @@ const standardLocations = [
   ".env",
   "config.json",
   "~/.canvas-scraper.env",
-  "~/.canvas-scraper.json"
+  "~/.canvas-scraper.json",
 ];
 
 console.log("Checking standard locations:");
-standardLocations.forEach(location => {
+standardLocations.forEach((location) => {
   const status = checkConfigExists(location);
   const statusEmoji = status.exists ? "✅" : "❌";
-  console.log(`${statusEmoji} ${location}: ${status.exists ? `Found (${status.format})` : "Not found"}`);
+  console.log(
+    `${statusEmoji} ${location}: ${status.exists ? `Found (${status.format})` : "Not found"}`,
+  );
 });
 
 // Overall status

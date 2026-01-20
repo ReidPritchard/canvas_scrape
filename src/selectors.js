@@ -38,7 +38,7 @@ export const SELECTORS = {
   breadcrumbs: {
     links: "#breadcrumbs a",
     className:
-      "#breadcrumbs > ul:nth-child(1) > li:nth-child(2) > a:nth-child(1) > span:nth-child(1)",
+      "#breadcrumbs > ol:nth-child(1) > li:nth-child(2) > a:nth-child(1) > span:nth-child(1)",
     firstLevel:
       "#breadcrumbs > ul:nth-child(1) > li:nth-child(1) > a:nth-child(1) > span:nth-child(1)",
   },

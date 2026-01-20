@@ -78,23 +78,23 @@ const verify_is_assignment = async (content) => {
 
 ## 4. Project Layout & Core Components
 
-| Directory/File            | Description                                                    |
-| ------------------------- | -------------------------------------------------------------- |
-| `main.js`                 | Main orchestration and entry point with session tracking       |
-| `setup.js`                | Standalone configuration wizard script                         |
-| `config.js`               | Configuration loader with multi-format and custom path support |
-| `src/config-wizard.js`    | Interactive setup wizard for first-time configuration          |
-| `src/canvas-scraper.js`   | Canvas authentication and content extraction                   |
-| `src/todoist-export.js`   | Todoist API integration with REST API                          |
-| `src/notion-export.js`    | Notion API integration                                         |
-| `src/logger.js`           | Winston logging configuration                                  |
-| `src/selectors.js`        | Centralized Canvas CSS selectors                               |
-| `src/error-handler.js`    | Shared error handling utilities                                |
-| `tests/`                  | Vitest test suite (comprehensive coverage)                     |
-| `tests/config-wizard.test.js` | Tests for configuration wizard and multi-format support    |
-| `.env.example`            | Environment variable template                                  |
-| `output.json`             | Cached assignment data for testing                             |
-| `package.json`            | Dependencies and scripts                                       |
+| Directory/File                | Description                                                    |
+| ----------------------------- | -------------------------------------------------------------- |
+| `main.js`                     | Main orchestration and entry point with session tracking       |
+| `setup.js`                    | Standalone configuration wizard script                         |
+| `config.js`                   | Configuration loader with multi-format and custom path support |
+| `src/config-wizard.js`        | Interactive setup wizard for first-time configuration          |
+| `src/canvas-scraper.js`       | Canvas authentication and content extraction                   |
+| `src/todoist-export.js`       | Todoist API integration with REST API                          |
+| `src/notion-export.js`        | Notion API integration                                         |
+| `src/logger.js`               | Winston logging configuration                                  |
+| `src/selectors.js`            | Centralized Canvas CSS selectors                               |
+| `src/error-handler.js`        | Shared error handling utilities                                |
+| `tests/`                      | Vitest test suite (comprehensive coverage)                     |
+| `tests/config-wizard.test.js` | Tests for configuration wizard and multi-format support        |
+| `.env.example`                | Environment variable template                                  |
+| `output.json`                 | Cached assignment data for testing                             |
+| `package.json`                | Dependencies and scripts                                       |
 
 **Key domain models/concepts:**
 
@@ -495,7 +495,7 @@ These files should not be modified without explicit permission:
 - **Interactive Setup Wizard**: Full-featured CLI wizard for first-time configuration (`pnpm run setup`)
 - **Multi-Format Support**: Support for both .env and JSON configuration files
 - **Custom Config Paths**: Support for user-specified config paths via `--config` flag or `CONFIG_PATH` env var
-- **Automatic Config Detection**: Checks standard locations (.env, config.json, ~/.canvas-scraper.*)
+- **Automatic Config Detection**: Checks standard locations (.env, config.json, ~/.canvas-scraper.\*)
 - **Guided Configuration**: Step-by-step wizard with validation, password masking, and encryption options
 - **Test Coverage**: Comprehensive tests for config wizard, JSON loading, and custom paths
 

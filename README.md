@@ -23,11 +23,13 @@ This program automates the tedious process of manually tracking Canvas assignmen
    - Windows: `canvas-scrape-win.exe`
 
 2. Make it executable (macOS/Linux):
+
    ```bash
    chmod +x canvas-scrape-macos
    ```
 
 3. Download and configure `.env.example`:
+
    ```bash
    # Download config template
    curl -LO https://github.com/ReidPritchard/canvas_scrape/releases/latest/download/.env.example
@@ -74,6 +76,7 @@ node setup.js
 ```
 
 The wizard will guide you through:
+
 - Choosing a configuration format (.env or JSON)
 - Setting your Canvas LMS credentials
 - Configuring optional Todoist integration
@@ -127,6 +130,7 @@ npx @dotenvx/dotenvx encrypt
 The application automatically detects and decrypts encrypted `.env` files when the `.env.keys` file is present. You can continue using plain `.env` files if encryption is not needed.
 
 **Important:**
+
 - Keep your `.env.keys` file secure and never commit it to version control
 - The `.env.keys` file is already git-ignored for your safety
 - Share the `.env.keys` file securely with team members who need access
@@ -136,16 +140,19 @@ The application automatically detects and decrypts encrypted `.env` files when t
 Canvas Scraper supports custom configuration file locations:
 
 **Using Environment Variable:**
+
 ```bash
 CONFIG_PATH=/path/to/your/config.json node main.js
 ```
 
 **Using CLI Flag:**
+
 ```bash
 node main.js --config /path/to/your/config.json
 ```
 
 **Standard Configuration Locations** (checked in order):
+
 1. `./config.json` or `./.env` (current directory)
 2. `~/.canvas-scraper.json` or `~/.canvas-scraper.env` (home directory)
 

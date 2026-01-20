@@ -44,23 +44,25 @@ The workflow will automatically:
 
 Each release includes:
 
-| File | Description | Platform |
-|------|-------------|----------|
-| `canvas-scrape-macos` | Standalone executable | macOS x64 |
-| `canvas-scrape-linux` | Standalone executable | Linux x64 |
-| `canvas-scrape-win.exe` | Standalone executable | Windows x64 |
-| `checksums.txt` | SHA256 checksums | All |
-| `.env.example` | Configuration template | All |
-| `README.txt` | Quick start guide | All |
+| File                    | Description            | Platform    |
+| ----------------------- | ---------------------- | ----------- |
+| `canvas-scrape-macos`   | Standalone executable  | macOS x64   |
+| `canvas-scrape-linux`   | Standalone executable  | Linux x64   |
+| `canvas-scrape-win.exe` | Standalone executable  | Windows x64 |
+| `checksums.txt`         | SHA256 checksums       | All         |
+| `.env.example`          | Configuration template | All         |
+| `README.txt`            | Quick start guide      | All         |
 
 ## Release Notes
 
 Release notes are automatically generated from:
+
 - Commit messages since last release
 - Pull request descriptions
 - Issue references
 
 You can edit the release after creation to add:
+
 - Breaking changes
 - Migration guides
 - Notable bug fixes
@@ -75,6 +77,7 @@ Follow semantic versioning:
 - **Patch** (v1.0.1): Bug fixes, selector updates, minor improvements
 
 Examples:
+
 - `v1.0.0` - First stable release
 - `v1.1.0` - Added new Canvas content type support
 - `v1.0.1` - Fixed selector after Canvas UI update
@@ -85,11 +88,13 @@ Examples:
 ### Workflow Fails During Build
 
 Check the workflow logs:
+
 1. Go to Actions tab
 2. Click on the failed workflow run
 3. Expand the failed step to see error messages
 
 Common issues:
+
 - **Dependencies fail to install**: Check `package.json` for correct versions
 - **Build fails**: Test locally with `pnpm run build`
 - **Packaging fails**: Test locally with `pnpm run package`
@@ -97,6 +102,7 @@ Common issues:
 ### Executables Too Large
 
 Expected sizes (with Brotli compression):
+
 - macOS: ~60-70MB
 - Linux: ~70-80MB
 - Windows: ~60-70MB
@@ -106,6 +112,7 @@ These include the Node.js runtime and all dependencies.
 ### Release Already Exists
 
 If a tag already exists:
+
 1. Delete the existing release and tag in GitHub
 2. Or use a new version number
 

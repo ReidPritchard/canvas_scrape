@@ -7,14 +7,13 @@
   "type": "module",
   "main": "main.js",
   "dependencies": {
-    "@doist/todoist-api-typescript": "^5.5.1",
+    "@doist/todoist-api-typescript": "^5.9.0",
     "@dotenvx/dotenvx": "^1.51.0",
     "@inquirer/prompts": "^7.8.6",
     "@notionhq/client": "^0.3.1",
     "chrono-node": "^2.3.1",
     "dotenv": "^17.2.2",
     "playwright": "^1.8.0",
-    "todoist": "^0.3.0",
     "winston": "^3.17.0"
   },
   "scripts": {
